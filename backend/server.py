@@ -294,7 +294,9 @@ async def sleepers_busts(scoring: Literal["standard", "half_ppr", "ppr"] = "half
 
 # ---------- Lineup Tool ----------
 def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
-    """Calculate a composite lineup score. Returns (score, factors_dict)."""
+    """Calculate a composite lineup score. Returns (score, factors_dict).
+    Factors live injury status (ESPN), live matchup (DvP from weekly nflverse data),
+    availability (games last season), tag boost, self-learned bias correction."""
     cur = p.get("current_season") or {}
     fppg = cur.get(f"fpts_per_game_{scoring}", 0) or 0
     games = cur.get("games", 0) or 0
@@ -304,7 +306,11 @@ def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
     m_score = matchup_score(opp, p["position"]) if opp else 0
     dvp = get_def_dvp(opp, p["position"]) if opp else {"rank": 16, "fpts_allowed_per_game": None, "source": "none"}
 
-    # Availability factor: penalize low games (injury)
+    # Live injury impact (ESPN refresh populates these fields)
+    inj_status = p.get("injury_status")
+    inj_pen = injury_penalty(inj_status)
+
+    # Availability factor: penalize low games (injury history)
     avail = 0.0
     if games < 8:
         avail = -2.0
@@ -315,7 +321,10 @@ def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
     tag = p.get("tag")
     tag_boost = {"elite": 1.5, "breakout": 0.8, "sleeper": 0.4, "risk": -0.8}.get(tag, 0)
 
-    score = round(fppg + m_score + avail + tag_boost, 2)
+    # Self-learned position bias correction (precomputed by caller into p["_lab_correction"])
+    correction = p.get("_lab_correction") or 0
+
+    score = round(fppg + m_score + avail + tag_boost + inj_pen + correction, 2)
     factors = {
         "fppg": fppg,
         "matchup_score": m_score,
@@ -326,6 +335,10 @@ def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
         "availability": avail,
         "tag_boost": tag_boost,
         "tag": tag,
+        "injury_status": inj_status,
+        "injury_short": p.get("injury_short"),
+        "injury_penalty": inj_pen,
+        "correction": correction,
     }
     return score, factors
 
@@ -821,6 +834,137 @@ async def defense_rankings():
     """Returns live computed DvP if available, else static fallback.
     Shape: {source, data: {position: {team: {rank, fpts_allowed_per_game, games, season}}}}"""
     return get_dvp_table()
+
+
+# ---------- This-week best/worst matchups widget ----------
+@api.get("/matchups/this-week")
+async def matchups_this_week():
+    """Live best/worst defenses being faced this week.
+    Combines live next-opponent map with live DvP. Output: 5 softest + 5 toughest per position."""
+    dvp = get_dvp_table()
+    data = dvp.get("data", {})
+    # Build set of (offense_team, opp_team, week) from current schedule cache via get_next_opponent on every NFL team
+    teams = await db.players.distinct("team", {"team": {"$ne": ""}})
+    week = None
+    rows: list[dict] = []
+    for t in teams:
+        if not t or len(t) > 4:
+            continue
+        info = get_next_opponent(t)
+        if not info or not info.get("opponent"):
+            continue
+        opp = info["opponent"]
+        week = info.get("week") or week
+        for pos in ("QB", "RB", "WR", "TE"):
+            cell = data.get(pos, {}).get(opp)
+            if not cell:
+                continue
+            rows.append({
+                "offense_team": t, "opp_team": opp, "position": pos,
+                "rank": cell.get("rank"),
+                "fpts_allowed_per_game": cell.get("fpts_allowed_per_game"),
+                "season": cell.get("season"),
+            })
+    # Best plays (offense facing softest D = highest rank)
+    by_pos: dict[str, dict] = {}
+    for pos in ("QB", "RB", "WR", "TE"):
+        sub = [r for r in rows if r["position"] == pos]
+        sub_soft = sorted(sub, key=lambda r: r["rank"] or 0, reverse=True)[:5]
+        sub_tough = sorted(sub, key=lambda r: r["rank"] or 99)[:5]
+        by_pos[pos] = {"soft": sub_soft, "tough": sub_tough}
+    return {"week": week, "source": dvp.get("source"), "by_position": by_pos}
+
+
+# ---------- Trade Analyzer ----------
+class TradeIn(BaseModel):
+    side_a_label: Optional[str] = "You give"
+    side_b_label: Optional[str] = "You get"
+    side_a_player_ids: List[str]
+    side_b_player_ids: List[str]
+    scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"
+
+
+def _trade_side_breakdown(items: list[dict], scoring: str) -> dict:
+    """Score each player on a trade side using the live Lab Score (injury + matchup + tag aware)."""
+    scored = []
+    total = 0.0
+    for p in items:
+        score, factors = _player_lineup_score_v2(p, scoring)
+        slim = {
+            "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
+            "tag": p.get("tag"),
+            "lineup_score": score, "factors": factors,
+            "current_fpts_per_game": p.get("current_fpts_per_game"),
+            "injury_status": p.get("injury_status"),
+            "next_opponent": factors.get("opponent"),
+        }
+        scored.append(slim)
+        total += score
+    scored.sort(key=lambda x: x["lineup_score"], reverse=True)
+    return {"players": scored, "total_lab_score": round(total, 2)}
+
+
+@api.post("/trade/analyze")
+async def analyze_trade(payload: TradeIn):
+    """Analyze a fantasy trade. Uses live injuries + DvP + tags to score each side, then asks Claude
+    for a concise verdict factoring in the same live signals."""
+    if not payload.side_a_player_ids or not payload.side_b_player_ids:
+        raise HTTPException(400, "Provide at least 1 player on each side")
+    all_ids = list(set(payload.side_a_player_ids + payload.side_b_player_ids))
+    cursor = db.players.find({"id": {"$in": all_ids}}, {"_id": 0, "news": 0})
+    players = await cursor.to_list(length=200)
+    players = [_attach_current_season(p, None, payload.scoring) for p in players]
+    # Apply learned bias before scoring (consistent with lineup endpoints)
+    bias = await _learned_bias_by_position()
+    for p in players:
+        p["_lab_correction"] = -1 * bias.get(p["position"], 0)
+
+    by_id = {p["id"]: p for p in players}
+    side_a_items = [by_id[i] for i in payload.side_a_player_ids if i in by_id]
+    side_b_items = [by_id[i] for i in payload.side_b_player_ids if i in by_id]
+    if len(side_a_items) != len(payload.side_a_player_ids) or len(side_b_items) != len(payload.side_b_player_ids):
+        raise HTTPException(404, "One or more player IDs not found")
+
+    side_a = _trade_side_breakdown(side_a_items, payload.scoring)
+    side_b = _trade_side_breakdown(side_b_items, payload.scoring)
+
+    diff = round(side_b["total_lab_score"] - side_a["total_lab_score"], 2)
+    # Verdict label
+    if abs(diff) < 1.5:
+        verdict = "fair"
+    elif diff > 6:
+        verdict = "side_b_strongly_wins"
+    elif diff > 1.5:
+        verdict = "side_b_wins"
+    elif diff < -6:
+        verdict = "side_a_strongly_wins"
+    else:
+        verdict = "side_a_wins"
+
+    # AI commentary — concise, uses live factors
+    from llm_service import generate_trade_verdict
+    commentary = await generate_trade_verdict(
+        side_a_label=payload.side_a_label or "Side A",
+        side_b_label=payload.side_b_label or "Side B",
+        side_a=side_a, side_b=side_b,
+        diff=diff, verdict=verdict, scoring=payload.scoring,
+    )
+
+    return {
+        "scoring": payload.scoring,
+        "side_a_label": payload.side_a_label,
+        "side_b_label": payload.side_b_label,
+        "side_a": side_a,
+        "side_b": side_b,
+        "diff": diff,
+        "verdict": verdict,
+        "commentary": commentary,
+        "data_freshness": {
+            "uses_live_injuries": True,
+            "uses_live_dvp": True,
+            "uses_live_schedule": True,
+        },
+    }
 
 
 # ---------- Teams ----------

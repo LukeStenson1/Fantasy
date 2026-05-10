@@ -11,6 +11,7 @@ import MyRankings from "./pages/MyRankings";
 import Lineup from "./pages/Lineup";
 import Rookies from "./pages/Rookies";
 import ThisWeek from "./pages/ThisWeek";
+import Trades from "./pages/Trades";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Route path="/this-week" element={<ThisWeek />} />
             <Route path="/lineup" element={<Lineup />} />
             <Route path="/start-sit" element={<Navigate to="/lineup" replace />} />
+            <Route path="/trades" element={<Trades />} />
             <Route path="/sleepers-busts" element={<SleepersBusts />} />
             <Route path="/rookies" element={<Rookies />} />
             <Route path="/stats" element={<Stats />} />

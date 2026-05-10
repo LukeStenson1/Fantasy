@@ -489,9 +489,10 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
     if not players:
         return {"status": "error", "reason": "no_players_built"}
 
-    # Merge: preserve existing news, ids if matching ext_id
-    existing = await db.players.find({}, {"_id": 0, "id": 1, "ext_id": 1, "news": 1}).to_list(length=10000)
+    # Merge: preserve existing news, ids if matching ext_id; track team changes for outlook cache busting
+    existing = await db.players.find({}, {"_id": 0, "id": 1, "ext_id": 1, "news": 1, "team": 1}).to_list(length=10000)
     ext_to_existing = {e.get("ext_id"): e for e in existing if e.get("ext_id")}
+    traded_player_ids: list[str] = []
 
     merged = []
     for p in players:
@@ -500,12 +501,22 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
             p["id"] = prev["id"]
             if prev.get("news"):
                 p["news"] = prev["news"]
+            # Detect trade / team change → mark outlook cache for invalidation
+            if prev.get("team") and p.get("team") and prev["team"] != p["team"]:
+                traded_player_ids.append(prev["id"])
         merged.append(p)
 
     # Replace collection
     await db.players.delete_many({})
     if merged:
         await db.players.insert_many(merged)
+
+    # Invalidate outlook cache for traded players (team change → new context)
+    outlooks_invalidated = 0
+    if traded_player_ids:
+        res = await db.outlooks.delete_many({"player_id": {"$in": traded_player_ids}})
+        outlooks_invalidated = res.deleted_count or 0
+        logger.info(f"Trades detected: {len(traded_player_ids)} players changed teams; invalidated {outlooks_invalidated} outlooks")
 
     # Seed 32 NFL team defenses (D/ST) — needed for full fantasy lineups
     def_docs = []
@@ -541,7 +552,7 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
             {"key": "next_opp", "value": next_opp, "updated_at": datetime.now(timezone.utc).isoformat()},
             upsert=True,
         )
-    return {"status": "ok", "players": len(merged), "seasons": available, "dvp_cells": sum(len(v) for v in (dvp_live or {}).values())}
+    return {"status": "ok", "players": len(merged), "seasons": available, "dvp_cells": sum(len(v) for v in (dvp_live or {}).values()), "trades_detected": len(traded_player_ids), "outlooks_invalidated": outlooks_invalidated}
 
 
 # Defense vs position rankings — synthesized 2024 (1=best D / hardest matchup, 32=worst D / softest matchup)

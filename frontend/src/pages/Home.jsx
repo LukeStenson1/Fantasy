@@ -3,17 +3,19 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
-import { ArrowRight, BarChart3, Flame, Sparkles, TrendingUp, Trophy, Wand2 } from "lucide-react";
-import { PositionBadge, TagBadge } from "../components/Badges";
+import { ArrowRight, ArrowRightLeft, BarChart3, Flame, Sparkles, TrendingUp, Trophy, Wand2 } from "lucide-react";
+import { PositionBadge, TagBadge, MatchupBadge } from "../components/Badges";
 import AdSlot from "../components/AdSlot";
 
 export default function Home() {
   const [summary, setSummary] = useState({ total_players: 0, data_seasons: [], last_refresh: null });
   const [movers, setMovers] = useState({ sleepers: [], busts: [], breakouts: [], elites: [] });
+  const [matchups, setMatchups] = useState(null);
 
   useEffect(() => {
     api.get("/stats/summary").then((r) => setSummary(r.data)).catch(() => {});
     api.get("/sleepers-busts", { params: { scoring: "half_ppr" } }).then((r) => setMovers(r.data)).catch(() => {});
+    api.get("/matchups/this-week").then((r) => setMatchups(r.data)).catch(() => {});
   }, []);
 
   return (
@@ -83,10 +85,29 @@ export default function Home() {
           <FeatureCard title="Lineup (AI + Start/Sit)" desc="Add your roster — the Lab auto-picks 1QB/2RB/2WR/1TE/1FLEX/1K/1DEF with Lab Score and reasoning." icon={<Wand2 className="w-5 h-5" />} to="/lineup" testid="feature-lineup" />
           <FeatureCard title="Sleepers & Busts" desc="Pre-tagged breakouts, sleepers, elites, and bust risks based on stat trajectories." icon={<Sparkles className="w-5 h-5" />} to="/sleepers-busts" testid="feature-radar" />
           <FeatureCard title="Rookie Outlooks" desc="Latest NFL draft class with AI-generated player+team trajectory outlooks. Updates as games happen." icon={<TrendingUp className="w-5 h-5" />} to="/rookies" testid="feature-rookies" />
+          <FeatureCard title="Trade Analyzer" desc="Add players to each side. The Lab scores live (injuries, matchups, tags) and gives an AI verdict — fair, who wins, why." icon={<ArrowRightLeft className="w-5 h-5" />} to="/trades" testid="feature-trades" />
           <FeatureCard title="Stats Browser" desc="Filter & sort every fantasy-relevant player across multiple seasons. Click any row for full profile." icon={<BarChart3 className="w-5 h-5" />} to="/stats" testid="feature-stats" />
           <FeatureCard title="My Lab" desc="Saved rankings, saved lineups, and the Lab's self-learning accuracy panel (login required)." icon={<Trophy className="w-5 h-5" />} to="/my-rankings" testid="feature-my-lab" />
         </div>
       </section>
+
+      {/* MATCHUPS OF THE WEEK */}
+      {matchups && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12" data-testid="matchups-section">
+          <div className="flex items-end justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-2">◆ Live · Computed from {matchups.source === "live" ? "this season's weekly data" : "2024 baseline"}</div>
+              <h2 className="font-display text-3xl sm:text-4xl font-black tracking-tight text-white">Best & Worst Matchups{matchups.week ? ` · Week ${matchups.week}` : ""}</h2>
+              <p className="text-slate-400 mt-2 max-w-2xl text-sm">Use these to find streamers and avoid landmines. Numbers are FPts allowed/G to that position.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {["RB", "WR", "QB", "TE"].map((pos) => (
+              <MatchupColumn key={pos} pos={pos} data={matchups.by_position[pos] || { soft: [], tough: [] }} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* MOVERS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
@@ -162,6 +183,50 @@ function MoverList({ title, players, accent, testid }) {
         {(!players || players.length === 0) && (
           <li className="px-4 py-6 text-sm text-slate-500 text-center">No players in this category yet.</li>
         )}
+      </ul>
+    </div>
+  );
+}
+
+
+function MatchupColumn({ pos, data }) {
+  const soft = data.soft || [];
+  const tough = data.tough || [];
+  return (
+    <div className="bg-slate-950/60 border border-slate-800 rounded-md overflow-hidden" data-testid={`matchup-col-${pos}`}>
+      <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+        <PositionBadge position={pos} />
+        <h3 className="font-display font-bold text-white">{pos}s</h3>
+      </div>
+
+      <div className="px-4 pt-3 pb-1 text-[10px] font-bold tracking-[0.2em] uppercase text-emerald-400">Smash spots</div>
+      <ul className="px-2">
+        {soft.slice(0, 3).map((r, i) => (
+          <li key={`s-${i}`} className="px-2 py-1.5 text-xs flex items-center justify-between gap-2" data-testid={`matchup-soft-${pos}-${i}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono-tab text-white font-bold">{r.offense_team}</span>
+              <span className="text-slate-500">vs</span>
+              <span className="font-mono-tab text-slate-400">{r.opp_team}</span>
+            </div>
+            <MatchupBadge rank={r.rank} opp={r.opp_team} position={pos} fptsAllowed={r.fpts_allowed_per_game} source="live" compact />
+          </li>
+        ))}
+        {soft.length === 0 && <li className="px-2 py-1.5 text-xs text-slate-600">—</li>}
+      </ul>
+
+      <div className="px-4 pt-3 pb-1 text-[10px] font-bold tracking-[0.2em] uppercase text-red-400">Avoid</div>
+      <ul className="px-2 pb-3">
+        {tough.slice(0, 3).map((r, i) => (
+          <li key={`t-${i}`} className="px-2 py-1.5 text-xs flex items-center justify-between gap-2" data-testid={`matchup-tough-${pos}-${i}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono-tab text-white font-bold">{r.offense_team}</span>
+              <span className="text-slate-500">vs</span>
+              <span className="font-mono-tab text-slate-400">{r.opp_team}</span>
+            </div>
+            <MatchupBadge rank={r.rank} opp={r.opp_team} position={pos} fptsAllowed={r.fpts_allowed_per_game} source="live" compact />
+          </li>
+        ))}
+        {tough.length === 0 && <li className="px-2 py-1.5 text-xs text-slate-600">—</li>}
       </ul>
     </div>
   );

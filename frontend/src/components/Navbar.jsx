@@ -29,6 +29,7 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           <NavLink to="/this-week" className={linkClass} data-testid="nav-this-week">This Week</NavLink>
           <NavLink to="/lineup" className={linkClass} data-testid="nav-lineup">Lineup</NavLink>
+          <NavLink to="/trades" className={linkClass} data-testid="nav-trades">Trades</NavLink>
           <NavLink to="/sleepers-busts" className={linkClass} data-testid="nav-sleepers">Sleepers</NavLink>
           <NavLink to="/rookies" className={linkClass} data-testid="nav-rookies">Rookies</NavLink>
           <NavLink to="/stats" className={linkClass} data-testid="nav-stats">Stats</NavLink>

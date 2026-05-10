@@ -67,7 +67,8 @@ def _fetch_sync() -> list[dict]:
 
 
 async def refresh_injuries(db) -> dict:
-    """Pull current league injuries from ESPN, upsert into players + injuries collection."""
+    """Pull current league injuries from ESPN, upsert into players + injuries collection.
+    Invalidates cached AI outlooks for any player whose injury status changes."""
     loop = asyncio.get_event_loop()
     try:
         payload = await loop.run_in_executor(None, _fetch_sync)
@@ -100,6 +101,13 @@ async def refresh_injuries(db) -> dict:
                 "date": inj.get("date"),
             })
 
+    # Snapshot prior injury status per player (id -> status) so we can detect deltas
+    prior_rows = await db.players.find(
+        {"injury_status": {"$exists": True, "$ne": None}},
+        {"_id": 0, "id": 1, "injury_status": 1},
+    ).to_list(length=2000)
+    prior = {r["id"]: r.get("injury_status") for r in prior_rows}
+
     # Replace injuries collection
     await db.injuries.delete_many({})
     if flat:
@@ -110,6 +118,7 @@ async def refresh_injuries(db) -> dict:
     await db.players.update_many({}, {"$unset": {"injury_status": "", "injury_short": "", "injury_type": ""}})
 
     matched = 0
+    matched_ids: set[str] = set()
     for inj in flat:
         if not inj["name_normalized"] or inj["status_normalized"] in ("active", ""):
             continue
@@ -119,38 +128,67 @@ async def refresh_injuries(db) -> dict:
         q["name"] = {"$regex": f"^{re.escape(inj['name'])}$", "$options": "i"}
         if inj.get("team"):
             q["team"] = inj["team"]
-        result = await db.players.update_one(q, {
-            "$set": {
-                "injury_status": inj["status"],
-                "injury_short": inj["short_comment"][:280],
-                "injury_type": inj.get("type"),
-                "injury_updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        })
-        if result.matched_count:
+        # Find target id first so we can track delta
+        target = await db.players.find_one(q, {"_id": 0, "id": 1})
+        if target:
+            await db.players.update_one({"id": target["id"]}, {
+                "$set": {
+                    "injury_status": inj["status"],
+                    "injury_short": inj["short_comment"][:280],
+                    "injury_type": inj.get("type"),
+                    "injury_updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            })
             matched += 1
+            matched_ids.add(target["id"])
             continue
         # Fallback: loose match without team filter
         q.pop("team", None)
-        result = await db.players.update_one(q, {
-            "$set": {
-                "injury_status": inj["status"],
-                "injury_short": inj["short_comment"][:280],
-                "injury_type": inj.get("type"),
-                "injury_updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        })
-        if result.matched_count:
+        target = await db.players.find_one(q, {"_id": 0, "id": 1})
+        if target:
+            await db.players.update_one({"id": target["id"]}, {
+                "$set": {
+                    "injury_status": inj["status"],
+                    "injury_short": inj["short_comment"][:280],
+                    "injury_type": inj.get("type"),
+                    "injury_updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            })
             matched += 1
+            matched_ids.add(target["id"])
+
+    # Compute delta: players whose injury status changed (added, removed, or status differs)
+    new_rows = await db.players.find(
+        {"id": {"$in": list(matched_ids)}},
+        {"_id": 0, "id": 1, "injury_status": 1},
+    ).to_list(length=2000)
+    new_status = {r["id"]: r.get("injury_status") for r in new_rows}
+    changed_ids = set()
+    for pid, new_st in new_status.items():
+        if prior.get(pid) != new_st:
+            changed_ids.add(pid)
+    # Players who WERE injured but no longer are
+    for pid, old_st in prior.items():
+        if pid not in new_status and old_st:
+            changed_ids.add(pid)
+
+    invalidated = 0
+    if changed_ids:
+        res = await db.outlooks.delete_many({"player_id": {"$in": list(changed_ids)}})
+        invalidated = res.deleted_count or 0
 
     await db.meta.replace_one(
         {"key": "last_injury_refresh"},
         {"key": "last_injury_refresh", "value": datetime.now(timezone.utc).isoformat(),
-         "fetched": len(flat), "matched": matched},
+         "fetched": len(flat), "matched": matched, "outlooks_invalidated": invalidated},
         upsert=True,
     )
-    logger.info(f"Injuries refresh: fetched {len(flat)}, matched to {matched} players")
-    return {"status": "ok", "fetched": len(flat), "matched": matched}
+    logger.info(
+        f"Injuries refresh: fetched {len(flat)}, matched {matched}, "
+        f"changed {len(changed_ids)} players, invalidated {invalidated} outlooks"
+    )
+    return {"status": "ok", "fetched": len(flat), "matched": matched,
+            "outlooks_invalidated": invalidated, "changed_players": len(changed_ids)}
 
 
 def injury_penalty(status: str | None) -> float:

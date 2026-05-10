@@ -46,15 +46,24 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         news_summary = "\n".join(
             f"- ({n.get('date','')}) {n.get('headline','')}: {n.get('snippet','')}" for n in news_items[:6]
         ) or "No recent news on record."
+        inj_status = player.get("injury_status")
+        inj_short = player.get("injury_short")
+        inj_line = ""
+        if inj_status:
+            inj_line = f"INJURY (LIVE, ESPN): {inj_status}"
+            if inj_short:
+                inj_line += f" — {inj_short[:200]}"
+            inj_line += "\n"
         prompt = (
             f"PLAYER: {player.get('name')} | {player.get('position')} | {player.get('team')}\n"
             f"AGE: {player.get('age', 'N/A')} | EXPERIENCE: {player.get('experience','N/A')} yrs\n"
             f"SCORING: {scoring.replace('_',' ').upper()}\n"
+            f"{inj_line}"
             f"LAST SEASON ({last_season.get('season','')}): "
             f"GP {last_season.get('games',0)}, FPTS/G {last_season.get('fpts_per_game_half_ppr',0)}, "
             f"YDs {last_season.get('total_yards',0)}, TDs {last_season.get('total_tds',0)}\n"
             f"NEWS:\n{news_summary}\n\n"
-            "Produce the outlook as instructed."
+            "Produce the outlook as instructed. If an injury is listed above, weight it heavily in Risk Factors."
         )
         sys_msg = SYSTEM_MSG
 
@@ -69,3 +78,60 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         return str(resp).strip()
     except Exception as e:
         return f"AI outlook unavailable: {e}"
+
+
+TRADE_SYSTEM_MSG = (
+    "You are an expert fantasy football trade analyst. Given two sides of a proposed trade with each "
+    "player's live Lab Score, current team, next opponent + matchup difficulty (DvP rank), live injury "
+    "status, and tag (elite/breakout/sleeper/risk), produce a concise, opinionated verdict. Always factor "
+    "in injury status — if a player is OUT/IR, they have no near-term value. Always factor matchup "
+    "difficulty for the upcoming week. Format: VERDICT (one line, who wins and by how much), "
+    "WHY (3-5 bullets covering injury, matchup, value tier, age/role), RECOMMENDATION (1-2 sentences). "
+    "Plain text. No markdown. Be direct and useful, not generic."
+)
+
+
+def _format_trade_side(label: str, side: dict) -> str:
+    lines = [f"{label} (total Lab Score: {side['total_lab_score']}):"]
+    for p in side["players"]:
+        f = p.get("factors") or {}
+        opp = f.get("opponent") or "—"
+        rank = f.get("def_rank") or "—"
+        fpa = f.get("def_fpts_allowed")
+        inj = p.get("injury_status") or "healthy"
+        tag = p.get("tag") or "—"
+        fppg = p.get("current_fpts_per_game") or 0
+        fpa_str = f", {fpa:.1f} allowed/G" if fpa else ""
+        lines.append(
+            f"  - {p['name']} ({p['position']}, {p['team']}) | LabScore {p['lineup_score']:.1f} | "
+            f"{fppg:.1f} FPts/G last yr | next: vs {opp} (D rank #{rank}{fpa_str}) | "
+            f"injury: {inj} | tag: {tag}"
+        )
+    return "\n".join(lines)
+
+
+async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a: dict, side_b: dict,
+                                  diff: float, verdict: str, scoring: str) -> str:
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        return "AI verdict unavailable: EMERGENT_LLM_KEY not configured."
+
+    prompt = (
+        f"SCORING: {scoring.replace('_', ' ').upper()}\n"
+        f"LAB-SCORE DIFF: {diff:+.1f} ({verdict.replace('_', ' ')})\n\n"
+        f"{_format_trade_side(side_a_label, side_a)}\n\n"
+        f"{_format_trade_side(side_b_label, side_b)}\n\n"
+        "Produce the trade verdict as instructed."
+    )
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=f"trade-{uuid.uuid4()}",
+        system_message=TRADE_SYSTEM_MSG,
+    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+    try:
+        resp = await chat.send_message(UserMessage(text=prompt))
+        return str(resp).strip()
+    except Exception as e:
+        return f"AI verdict unavailable: {e}"

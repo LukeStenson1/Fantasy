@@ -33,6 +33,9 @@
 - ✅ DARK theme, FantasyLab branding, FL logo.
 - ✅ ESPN real-time injuries — refreshed via `POST /api/admin/refresh-injuries`, badges on Stats table + factored into Lab Score.
 - ✅ **Defense vs Position (DvP) overlay (2026-02)** — live computed from `nfl-data-py` weekly data (latest season w/ ≥4 weeks). Each defense ranked 1–32 per position with FPts allowed/G. Color-coded matchup badges (🟢 EASY/GOOD, 🟦 NEUTRAL, 🔴 HARD/TOUGH) on Lineup slot cards, bench, and StatsTable expanded profile. Reasoning includes "X.X allowed/G". Persisted in `db.meta`, hydrated on startup, falls back to static 2024 baseline if not yet computed.
+- ✅ **Trade Analyzer (2026-02)** — `POST /api/trade/analyze` + `/trades` page. Live Lab Scores (injury + DvP + tag aware) on each side, Lab Score diff verdict + Claude AI commentary covering injury, matchup, value tier, and recommendation. Real-time signals: live ESPN injuries, live DvP, live next-opponent — every opinion reflects today's state.
+- ✅ **Best & Worst Matchups widget on Home (2026-02)** — `GET /api/matchups/this-week` returns top 5 smash spots + top 5 avoid matchups per position (RB/WR/QB/TE) using live next-opponent and live DvP. Surfaces streamer plays + landmines without needing to dig.
+- ✅ **Real-time freshness wiring (2026-02)** — Lab Score `_player_lineup_score` now applies ESPN `injury_penalty()` (Q -1.0, D -3.5, OUT/IR -10). Cached AI player outlooks auto-invalidated when (a) injury status changes during ESPN refresh, or (b) player team changes during nflverse refresh (= trade detection). All opinions, verdicts, and recommendations now reflect the latest data — refresh propagates downstream automatically.
 
 ## Test Credentials
 - Admin: `admin@ffref.com` / `admin123`
@@ -50,9 +53,10 @@
 - **P1**: Sleeper league import (one-click roster sync into Lineup tool via Sleeper username).
 - **P2**: AdSense / Carbon ad integration (slot containers ready in code).
 - **P2**: Yahoo / ESPN league import (OAuth — more complex than Sleeper).
-- **P2**: Refactor `server.py` (~1000+ lines) into modular FastAPI routers (`/routes/players.py`, `/routes/lineups.py`, `/routes/admin.py`).
+- **P2**: Refactor `server.py` (~1100+ lines) into modular FastAPI routers (`/routes/players.py`, `/routes/lineups.py`, `/routes/admin.py`, `/routes/trades.py`).
+- **P2**: Save trade analysis history per user (cache verdicts so they don't re-burn LLM credits).
 - **P3**: Mock-draft simulator using sleeper/bust tags.
-- **P3**: Trade analyzer.
+- **P3**: ~~Trade analyzer~~ ✅ DONE.
 
 ## API Quick Reference
 - `GET /api/players` `?position&team&season&scoring&search&sort&limit`
