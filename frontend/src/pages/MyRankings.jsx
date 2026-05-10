@@ -12,11 +12,21 @@ import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import AdSlot from "../components/AdSlot";
 
+function relativeTime(iso) {
+  if (!iso) return "never";
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
 export default function MyRankings() {
   const { user, loading } = useAuth();
   const [rankings, setRankings] = useState([]);
   const [lineups, setLineups] = useState([]);
   const [predStats, setPredStats] = useState(null);
+  const [dataStatus, setDataStatus] = useState(null);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [scoring, setScoring] = useState("half_ppr");
@@ -29,6 +39,7 @@ export default function MyRankings() {
       api.get("/rankings/me").then((r) => setRankings(r.data));
       api.get("/lineups/me").then((r) => setLineups(r.data));
       api.get("/predictions/stats").then((r) => setPredStats(r.data));
+      if (user.role === "admin") api.get("/admin/data-status").then((r) => setDataStatus(r.data));
     }
   }, [user]);
 
@@ -88,12 +99,22 @@ export default function MyRankings() {
               <span className="ml-auto text-[10px] font-bold tracking-[0.15em] uppercase text-amber-400">admin only</span>
             </div>
             <p className="text-sm text-slate-400 mb-3">Re-pull live data from nflverse, then score open predictions so the Lab learns from new outcomes.</p>
+            {dataStatus?.last_refresh && (
+              <div className="text-xs font-mono-tab text-slate-500 mb-3" data-testid="last-refresh-info">
+                Last refresh: <span className="text-emerald-300">{relativeTime(dataStatus.last_refresh.value)}</span>
+                {dataStatus.last_refresh.seasons && <> · seasons: <span className="text-slate-300">{dataStatus.last_refresh.seasons.join(", ")}</span></>}
+                {" · "}<span className="text-slate-300">{dataStatus.player_count} players</span>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={async () => {
                   toast.info("Refreshing from nflverse…");
-                  try { const { data } = await api.post("/admin/refresh-data?force=true"); toast.success(`Loaded ${data.players} players · seasons ${data.seasons?.join(", ")}`); }
-                  catch { toast.error("Refresh failed"); }
+                  try {
+                    const { data } = await api.post("/admin/refresh-data?force=true");
+                    toast.success(`Loaded ${data.players} players · seasons ${data.seasons?.join(", ")}`);
+                    const st = await api.get("/admin/data-status"); setDataStatus(st.data);
+                  } catch { toast.error("Refresh failed"); }
                 }}
                 className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold" data-testid="admin-refresh-btn">
                 Refresh Data from nflverse
