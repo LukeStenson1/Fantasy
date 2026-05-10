@@ -1,0 +1,56 @@
+{
+  "summary": "Iteration 3 testing complete. Backend: 49/49 pytest pass (100%) — all new iter-3 endpoints work: /api/rookies (53 rookies, year=2025, Cam Ward/Travis Hunter/Ashton Jeanty present), /api/this-week (10 plays + 5 fades w/ news_search_url), /api/lineups CRUD + auth gating, /api/predictions log/stats/settle (settle requires admin), /api/lineup/suggest auto-grows predictions count via background task (verified 51 -> 60+), /api/players/{id}/news-url returns Google News URL, player detail returns next_opponent from real 2025 schedule. Frontend: Navbar has This Week + Rookies, /rookies renders 53 cards with filter buttons & dropdown working, clicking Cam Ward expands to AI Year-1 Outlook + 'Latest news' external link, /this-week shows Top 10 Plays + Top 5 Fades correctly, /my-rankings rebranded 'My Lab' shows Self-Learning Accuracy panel (23/51 settled, MAE/bias by position) and Rankings/Saved Lineups tabs. ONE GAP FOUND: /lineup page is MISSING the Save Lineup bar (title input + Save button) — backend POST /api/lineups works perfectly via API, but the frontend UI never renders the save form even when authenticated.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Lineup.jsx",
+        "issue": "Save Lineup bar (title input + Save button) is NOT rendered. /app/frontend/src/pages/Lineup.jsx imports the Save icon at line 6 but never renders a save form anywhere in the 210-line file. Authenticated user on /lineup sees suggested lineup with swap buttons only — no way to save. Backend /api/lineups POST is fully functional via direct API call.",
+        "selector": "/lineup page, expected save-lineup-bar testid",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Save lineup from /lineup",
+        "issue": "Frontend never calls POST /api/lineups. Saved Lineups tab on /my-rankings stays at 0 because UI provides no entry point. Endpoint itself is healthy (test_save_lineup pass).",
+        "affected_selectors": ["/lineup save bar"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter3.py",
+    "/app/backend/tests/test_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [
+    "Add a Save Lineup bar to /app/frontend/src/pages/Lineup.jsx — title <input> + 'Save Lineup' <button> that POSTs to /api/lineups with starters mapped from the suggested lineup ({slot, player_id}) and bench player_ids. Hide the bar (or show 'Login to save') when user is not authenticated. Wire data-testid='save-lineup-title' and 'save-lineup-btn' for testability.",
+    "Optional: register pytest custom mark 'slow' in pytest.ini or pyproject to silence the PytestUnknownMarkWarning."
+  ],
+  "critical_code_review_comments": [
+    "server.py: duplicate definition of _draft_round() — defined at line 483 and again at line 695. Both bodies are identical, so behavior is unaffected, but the second clobbers the first at import time. Remove one.",
+    "server.py /api/admin/data-status (l.829) is still anonymous (carryover from iter-2 review). Exposes player_count + last_refresh meta. Consider gating behind admin role.",
+    "server.py _attach_current_season silent-fallback bug from iter-1/iter-2 is no longer reproducible because nflverse data now contains 2023 rows for all 217 stat-rich players, but the underlying logic at lines 156-167 still falls back to most-recent season when explicit season is missing — fix is still warranted (one-line guard).",
+    "server.py CORS list (l.908) hardcodes 'http://localhost:3000' alongside FRONTEND_URL — fine for dev, but redundant if FRONTEND_URL already points to local. backend/.env still has unused CORS_ORIGINS='*' (dead config).",
+    "server.py /api/lineup/suggest fires asyncio.create_task(_log_starter_predictions(...)) on EVERY request — this means an anonymous bot or scraper could flood the predictions collection. Consider rate-limiting or deduplicating by (player_id, week, source) before insert.",
+    "Lineup.jsx imports Save icon but never uses it (dead import). Reflects the missing save-bar feature."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter3.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (49/49 pytest — 31 from iter-2 carry-forward + 18 new iter-3)",
+    "frontend": "85% (6/7 flows verified: nav links, /rookies render+expand, /this-week, /my-rankings tabs+accuracy, login auth, stats expand;  1 missing: /lineup save bar)"
+  },
+  "test_credentials": "admin@ffref.com / admin123 (admin), user@ffref.com / user123 (user) — both verified working via cookie auth.",
+  "seed_data_creation": "Created+deleted TEST_Lineup via authenticated user. Logged 1 prediction via /api/predictions. /api/predictions/settle (admin) settled open predictions to populate Self-Learning Accuracy panel (now 23/51 settled). All test data prefixed TEST_ where applicable.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is fully verified: 49 tests in /app/backend/tests/ (test_backend.py + test_iter3.py). Use them as regression. Known good rookie names in 2025 class for assertions: Cam Ward (TEN #1), Travis Hunter (JAX #2), Ashton Jeanty (LV #6), Tetairoa McMillan (CAR #8), Omarion Hampton (LAC #22). 2025 schedule live: BUF→MIA, CIN→CLE, BAL→PIT, PHI→DAL etc. Self-Learning panel currently shows positive bias for RB/WR/TE (over-predicting) and negative for QB. After main-agent fix to Lineup.jsx Save bar, re-test: (1) auth user POST flow from /lineup, (2) Saved Lineups (n) badge updates on /my-rankings, (3) DELETE from My Lab works.",
+  "rca of the issue": "Save Lineup bar absent on /lineup: /app/frontend/src/pages/Lineup.jsx (210 LOC) only renders the SUGGESTED lineup (8 cards + swap buttons + bench). The component never wires the Save form even though backend POST /api/lineups is healthy. Fix: add a top bar above the cards with `<input>` (title) + `<button onClick={async () => { await axios.post('/api/lineups', { title, scoring, starters: starters.map(s=>({slot, player_id})), bench: bench.map(b=>b.id) }, {withCredentials:true}); }}>Save Lineup</button>`. Gate behind `auth.user` (already available from AuthContext used by Navbar). No backend change needed."
+}

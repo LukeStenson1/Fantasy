@@ -2,12 +2,14 @@
 
 Strategy:
 - On first refresh, pull seasonal stats + roster for available seasons (2022-2025).
+- 2025 rookies pulled from rosters even when 2025 seasonal stats not yet published.
+- Real schedules pulled — next opponent computed from upcoming REG games.
 - Compute fantasy points (standard, half-PPR, PPR).
 - Filter to fantasy-relevant positions (QB, RB, WR, TE, K) with min thresholds.
 - Tag breakouts/sleepers/risks heuristically from stats trajectory.
 - Re-runs cheaply if `force=False` and players collection is fresh (<24h).
 
-When 2025/2026 becomes available in nflverse, refresh picks it up automatically.
+When 2025/2026 seasonal stats become available in nflverse, refresh picks them up automatically.
 """
 from __future__ import annotations
 
@@ -117,10 +119,12 @@ def _detect_tag(seasons: list[dict], position: str) -> str | None:
 
 
 def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list[dict]:
-    """Merge seasonal stats with rosters, group by player, filter top players."""
+    """Merge seasonal stats with rosters, group by player, filter top players.
+    Also surfaces 2025+ rookies (years_exp == 0) even if seasonal stats not yet published."""
     import pandas as pd
 
     all_player_seasons: dict[str, dict] = {}  # player_id -> {info, seasons[]}
+    rookie_meta: dict[str, dict] = {}  # player_id -> rookie attrs
 
     for season, df in seasonal_dfs.items():
         if df is None or df.empty:
@@ -151,16 +155,52 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                 "birth_date": row.get("birth_date"),
                 "seasons": [],
             })
-            # Keep most recent team
             if not pd.isna(team):
                 entry["team"] = str(team)
             entry["seasons"].append(_season_record(row, season))
 
-    # Filter to top-N per position based on best-of-any-season fpts (so high-profile
-    # injured stars like CMC who had monster prior seasons still surface).
+    # ROOKIES: pull rookies (years_exp==0) from each season's roster — even when
+    # seasonal stats aren't published yet (e.g., 2025 in early season, or pre-season).
+    for season, roster in roster_dfs.items():
+        if roster is None or roster.empty:
+            continue
+        if "years_exp" not in roster.columns:
+            continue
+        rookies = roster[(roster["years_exp"] == 0) & (roster["position"].isin(FANTASY_POSITIONS))]
+        for _, row in rookies.iterrows():
+            pid = row.get("player_id")
+            if not pid or pd.isna(pid):
+                continue
+            rookie_meta[pid] = {
+                "rookie_year": int(season),
+                "draft_number": (None if pd.isna(row.get("draft_number")) else int(row.get("draft_number"))),
+                "draft_club": (None if pd.isna(row.get("draft_club")) else str(row.get("draft_club"))),
+                "college": (None if pd.isna(row.get("college")) else str(row.get("college"))),
+            }
+            # Ensure rookie is in our list even with 0 games
+            if pid not in all_player_seasons:
+                all_player_seasons[pid] = {
+                    "ext_id": pid,
+                    "name": str(row.get("player_name") or ""),
+                    "position": str(row.get("position") or ""),
+                    "team": str(row.get("team") or ""),
+                    "birth_date": row.get("birth_date"),
+                    "seasons": [],
+                }
+
+    # Filter to top-N per position based on best-of-any-season fpts.
+    # Rookies (no seasons yet) included separately, ranked by inverse draft_number.
     per_position: dict[str, list[dict]] = {}
+    rookies_with_no_seasons: list[dict] = []
     for entry in all_player_seasons.values():
         pos = entry["position"]
+        if not entry["seasons"]:
+            # Pure rookie — keep aside
+            r = rookie_meta.get(entry["ext_id"])
+            if r:
+                entry["_rookie_score"] = -1 * (r.get("draft_number") or 999)
+                rookies_with_no_seasons.append(entry)
+            continue
         best = max((s.get("fpts_half_ppr", 0) for s in entry["seasons"]), default=0)
         entry["_latest_fpts"] = best
         per_position.setdefault(pos, []).append(entry)
@@ -170,6 +210,10 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         cap = TOP_N.get(pos, 30)
         lst.sort(key=lambda e: e["_latest_fpts"], reverse=True)
         selected.extend(lst[:cap])
+
+    # Add up to ~50 rookies (early-round draft picks) regardless of stats availability
+    rookies_with_no_seasons.sort(key=lambda e: e.get("_rookie_score", -999), reverse=True)
+    selected.extend(rookies_with_no_seasons[:60])
 
     # Build final docs
     today = datetime.now(timezone.utc).date()
@@ -192,6 +236,8 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         # Experience: count of seasons with games >= 1 in the data
         exp = len(seasons)
         tag = _detect_tag(seasons, e["position"])
+        rookie_info = None
+        # Will be filled-in by caller via rookie_meta
         final.append({
             "id": str(uuid.uuid4()),
             "ext_id": e["ext_id"],
@@ -202,11 +248,20 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             "experience": exp,
             "headshot": "",
             "tag": tag,
+            "rookie_info": rookie_info,  # filled in below
             "seasons": seasons,
             "news": [],
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         })
+    # Attach rookie metadata if present
+    for p in final:
+        rm = rookie_meta.get(p["ext_id"])
+        if rm:
+            p["rookie_info"] = rm
+            # If only seasons we have are < their rookie year, mark as zero-experience rookie
+            if not p["seasons"] or all(s.get("season", 0) < rm["rookie_year"] for s in p["seasons"]):
+                p["experience"] = 0
     return final
 
 
@@ -218,13 +273,54 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
     for s in seasons:
         try:
             seasonal_dfs[s] = nfl.import_seasonal_data([s])
-            roster_dfs[s] = nfl.import_seasonal_rosters([s])
-            logger.info(f"Pulled {s} season: {len(seasonal_dfs[s])} stat rows, {len(roster_dfs[s])} roster rows")
+            logger.info(f"Pulled {s} seasonal stats: {len(seasonal_dfs[s])} rows")
         except Exception as e:
-            logger.warning(f"Season {s} not available: {e}")
+            logger.warning(f"Season {s} stats not available: {e}")
             seasonal_dfs[s] = None
+        try:
+            roster_dfs[s] = nfl.import_seasonal_rosters([s])
+            logger.info(f"Pulled {s} rosters: {len(roster_dfs[s])} rows")
+        except Exception as e:
+            logger.warning(f"Season {s} roster not available: {e}")
             roster_dfs[s] = None
     return seasonal_dfs, roster_dfs
+
+
+def _fetch_schedule_sync(seasons: Iterable[int]):
+    """Pull real NFL schedule for given seasons. Returns dict team -> next opponent."""
+    import nfl_data_py as nfl
+    import pandas as pd
+    next_opp: dict[str, dict] = {}
+    try:
+        sched = nfl.import_schedules(list(seasons))
+        if sched is None or sched.empty:
+            return next_opp
+        # Filter REG only, future games only
+        today = pd.Timestamp(datetime.now(timezone.utc).date())
+        sched["gameday_dt"] = pd.to_datetime(sched["gameday"], errors="coerce")
+        future = sched[(sched["game_type"] == "REG") & (sched["gameday_dt"] >= today)]
+        # Fallback: latest REG week if no future games (off-season)
+        if future.empty:
+            latest_season = int(sched["season"].max())
+            ss = sched[(sched["season"] == latest_season) & (sched["game_type"] == "REG")]
+            if not ss.empty:
+                future = ss[ss["week"] == ss["week"].max()]
+        future = future.sort_values("gameday_dt") if not future.empty else future
+        for _, g in future.iterrows():
+            home, away = g.get("home_team"), g.get("away_team")
+            week = int(g.get("week", 0)) if not pd.isna(g.get("week")) else 0
+            gameday = g.get("gameday")
+            if isinstance(home, str) and home not in next_opp:
+                next_opp[home] = {"opponent": away, "home": True, "week": week, "gameday": str(gameday)}
+            if isinstance(away, str) and away not in next_opp:
+                next_opp[away] = {"opponent": home, "home": False, "week": week, "gameday": str(gameday)}
+    except Exception as e:
+        logger.warning(f"Schedule fetch failed: {e}")
+    return next_opp
+
+
+# Cache: refreshed each refresh_player_data() call
+_NEXT_OPP_CACHE: dict[str, dict] = {}
 
 
 async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bool = False) -> dict:
@@ -247,7 +343,17 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
     loop = asyncio.get_event_loop()
     seasonal_dfs, roster_dfs = await loop.run_in_executor(None, _fetch_seasons_sync, seasons)
     available = [s for s, df in seasonal_dfs.items() if df is not None and not df.empty]
-    if not available:
+    available_rosters = [s for s, df in roster_dfs.items() if df is not None and not df.empty]
+
+    # Pull live schedules for available roster seasons
+    sched_seasons = available_rosters or available
+    next_opp = await loop.run_in_executor(None, _fetch_schedule_sync, sched_seasons)
+    global _NEXT_OPP_CACHE
+    if next_opp:
+        _NEXT_OPP_CACHE = next_opp
+        logger.info(f"Live schedule loaded: {len(next_opp)} teams have next-opponent data")
+
+    if not available and not available_rosters:
         return {"status": "error", "reason": "no_data"}
 
     players = await loop.run_in_executor(None, _build_players_from_dataframes, seasonal_dfs, roster_dfs)
@@ -298,14 +404,34 @@ DEF_VS_POS_2024 = {
 }
 
 
-# Static "next week" opponent map — represents the upcoming matchup for each team for the lineup tool.
-# (Synthesized; in production this would come from nfl_data_py.import_schedules + current week.)
+# Static "next week" opponent map — fallback if live schedule fetch fails.
 NEXT_OPPONENT = {
     "ARI": "SEA", "ATL": "TB", "BAL": "PIT", "BUF": "MIA", "CAR": "NO", "CHI": "GB", "CIN": "CLE", "CLE": "CIN",
     "DAL": "PHI", "DEN": "LV", "DET": "MIN", "GB": "CHI", "HOU": "JAX", "IND": "TEN", "JAX": "HOU", "KC": "LAC",
     "LAC": "KC", "LAR": "SF", "LV": "DEN", "MIA": "BUF", "MIN": "DET", "NE": "NYJ", "NO": "CAR", "NYG": "WAS",
     "NYJ": "NE", "PHI": "DAL", "PIT": "BAL", "SEA": "ARI", "SF": "LAR", "TB": "ATL", "TEN": "IND", "WAS": "NYG",
 }
+
+
+def get_next_opponent(team: str) -> dict | None:
+    """Return {opponent, home, week, gameday} from live schedule, fallback to static map."""
+    if team in _NEXT_OPP_CACHE:
+        return _NEXT_OPP_CACHE[team]
+    opp = NEXT_OPPONENT.get(team)
+    if opp:
+        return {"opponent": opp, "home": False, "week": 0, "gameday": None}
+    return None
+
+
+def get_next_opponent_team(team: str) -> str | None:
+    info = get_next_opponent(team)
+    return info["opponent"] if info else None
+
+
+def player_news_search_url(player_name: str) -> str:
+    """Build a Google News search URL for a player — fallback link until we wire a real news API."""
+    from urllib.parse import quote_plus
+    return f"https://news.google.com/search?q={quote_plus(player_name + ' NFL fantasy')}"
 
 
 def get_def_rank(opp_team: str, position: str) -> int:

@@ -28,7 +28,8 @@ from auth import (
 from llm_service import generate_player_outlook
 from nfl_data_service import (
     refresh_player_data, get_def_rank, matchup_score,
-    NEXT_OPPONENT, DEF_VS_POS_2024,
+    DEF_VS_POS_2024, get_next_opponent, get_next_opponent_team,
+    player_news_search_url,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -65,6 +66,28 @@ class StartSitIn(BaseModel):
     player_ids: List[str]
     scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"
     slot: Optional[Literal["QB", "RB", "WR", "TE", "FLEX"]] = None
+
+
+class LineupSlot(BaseModel):
+    slot: str
+    player_id: str
+
+
+class LineupIn(BaseModel):
+    title: str
+    scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"
+    starters: List[LineupSlot]
+    bench: List[str] = []
+
+
+class PredictionIn(BaseModel):
+    player_id: str
+    scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"
+    predicted_fpts: float
+    week: Optional[int] = None
+    season: Optional[int] = None
+    source: Optional[str] = "lineup_ai"
+
 
 
 # ---------- Auth ----------
@@ -185,12 +208,15 @@ async def get_player(player_id: str, scoring: Literal["standard", "half_ppr", "p
     if not p:
         raise HTTPException(404, "Player not found")
     p = _attach_current_season(p, None, scoring)
-    # Add matchup info
-    opp = NEXT_OPPONENT.get(p.get("team", ""), None)
-    if opp:
-        p["next_opponent"] = opp
-        p["matchup_def_rank"] = get_def_rank(opp, p["position"])
-        p["matchup_score"] = matchup_score(opp, p["position"])
+    # Add matchup info from live schedule
+    info = get_next_opponent(p.get("team", ""))
+    if info:
+        p["next_opponent"] = info["opponent"]
+        p["next_opponent_home"] = info.get("home")
+        p["next_opponent_week"] = info.get("week")
+        p["matchup_def_rank"] = get_def_rank(info["opponent"], p["position"])
+        p["matchup_score"] = matchup_score(info["opponent"], p["position"])
+    p["news_search_url"] = player_news_search_url(p["name"])
     return p
 
 
@@ -265,8 +291,8 @@ def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
     fppg = cur.get(f"fpts_per_game_{scoring}", 0) or 0
     games = cur.get("games", 0) or 0
 
-    # Matchup
-    opp = NEXT_OPPONENT.get(p.get("team") or "", None)
+    # Matchup from live schedule
+    opp = get_next_opponent_team(p.get("team") or "")
     m_score = matchup_score(opp, p["position"]) if opp else 0
     def_rank = get_def_rank(opp, p["position"]) if opp else 16
 
@@ -319,12 +345,17 @@ def _reasoning_text(p: dict, factors: dict) -> str:
 
 
 @api.get("/lineup/suggest")
-async def suggest_lineup(scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"):
-    """Suggest a starting lineup: 1QB / 2RB / 2WR / 1TE / 1FLEX."""
+async def suggest_lineup(request: Request, scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"):
+    """Suggest a starting lineup: 1QB / 2RB / 2WR / 1TE / 1FLEX. Logs predictions for self-learning."""
     cursor = db.players.find({"position": {"$in": ["QB", "RB", "WR", "TE"]}}, {"_id": 0, "news": 0})
     items = await cursor.to_list(length=2000)
     items = [_attach_current_season(p, None, scoring) for p in items]
     items = [p for p in items if p.get("current_season")]
+
+    # Apply self-learned position bias correction
+    bias = await _learned_bias_by_position()
+    for p in items:
+        p["_lab_correction"] = -1 * bias.get(p["position"], 0)  # subtract avg over-projection
 
     scored = []
     for p in items:
@@ -342,6 +373,7 @@ async def suggest_lineup(scoring: Literal["standard", "half_ppr", "ppr"] = "half
             "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
             "tag": p.get("tag"), "lineup_score": p["lineup_score"], "reasoning": p["reasoning"],
             "factors": p["factors"], "current_fpts_per_game": p.get("current_fpts_per_game"),
+            "news_search_url": player_news_search_url(p["name"]),
         }
 
     qb = (by_pos.get("QB", []) or [])[:1]
@@ -358,6 +390,10 @@ async def suggest_lineup(scoring: Literal["standard", "half_ppr", "ppr"] = "half
     for pos, lst in by_pos.items():
         bench[pos] = [slim(p) for p in lst[:8] if p["id"] not in starters and p["id"] not in {f["id"] for f in flex}]
 
+    # Log starter predictions for self-learning (no-op for anonymous users — captured globally)
+    starter_list = qb + rb + wr + te + flex
+    asyncio.create_task(_log_starter_predictions(starter_list, scoring, "lineup_ai"))
+
     return {
         "scoring": scoring,
         "starters": {
@@ -369,6 +405,42 @@ async def suggest_lineup(scoring: Literal["standard", "half_ppr", "ppr"] = "half
         },
         "bench_alternatives": bench,
     }
+
+
+async def _learned_bias_by_position() -> dict:
+    """Return mean over-projection per position (positive = we over-predicted)."""
+    pipeline = [
+        {"$match": {"actual_fpts": {"$ne": None}}},
+        {"$group": {
+            "_id": "$position",
+            "n": {"$sum": 1},
+            "bias_sum": {"$sum": {"$subtract": ["$predicted_fpts", "$actual_fpts"]}},
+        }},
+    ]
+    rows = await db.predictions.aggregate(pipeline).to_list(length=10)
+    return {r["_id"]: r["bias_sum"] / max(r["n"], 1) for r in rows if r["n"] >= 5}
+
+
+async def _log_starter_predictions(starters: list[dict], scoring: str, source: str):
+    """Async-fire log predictions; never raise — best-effort self-learning."""
+    try:
+        for p in starters:
+            doc = {
+                "id": str(uuid.uuid4()),
+                "user_id": None,
+                "player_id": p["id"],
+                "player_name": p["name"], "position": p["position"], "team": p["team"],
+                "scoring": scoring,
+                "predicted_fpts": p.get("lineup_score") or 0,
+                "actual_fpts": None,
+                "week": None, "season": None,
+                "source": source,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "settled_at": None,
+            }
+            await db.predictions.insert_one(doc)
+    except Exception as e:
+        logger.warning(f"Prediction logging failed: {e}")
 
 
 @api.post("/start-sit")
@@ -405,6 +477,228 @@ async def start_sit(payload: StartSitIn):
         "ranked": out_filtered,
         "recommendation": out_filtered[0] if out_filtered else None,
     }
+
+
+# ---------- Rookies ----------
+def _draft_round(dn: Optional[int]) -> Optional[int]:
+    if not dn:
+        return None
+    return min(7, ((dn - 1) // 32) + 1)
+
+
+# ---------- Lineups (auth) ----------
+@api.post("/lineups")
+async def save_lineup(payload: LineupIn, request: Request):
+    user = await require_user(request, db)
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"],
+        "title": payload.title, "scoring": payload.scoring,
+        "starters": [s.model_dump() for s in payload.starters],
+        "bench": payload.bench,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.lineups.insert_one({**doc})
+    return doc
+
+
+@api.get("/lineups/me")
+async def my_lineups(request: Request):
+    user = await require_user(request, db)
+    rows = await db.lineups.find({"user_id": user["id"]}, {"_id": 0}).to_list(length=200)
+    rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+    return rows
+
+
+@api.delete("/lineups/{lineup_id}")
+async def delete_lineup(lineup_id: str, request: Request):
+    user = await require_user(request, db)
+    res = await db.lineups.delete_one({"id": lineup_id, "user_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Lineup not found")
+    return {"ok": True}
+
+
+# ---------- Predictions / Self-Learning ----------
+@api.post("/predictions")
+async def log_prediction(payload: PredictionIn, request: Request):
+    """Log a Lab Score prediction. Used for self-learning accuracy tracking."""
+    user = await get_current_user_from_request(request, db)
+    p = await db.players.find_one({"id": payload.player_id}, {"_id": 0, "name": 1, "position": 1, "team": 1})
+    if not p:
+        raise HTTPException(404, "Player not found")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": (user or {}).get("id"),
+        "player_id": payload.player_id,
+        "player_name": p["name"], "position": p["position"], "team": p["team"],
+        "scoring": payload.scoring,
+        "predicted_fpts": payload.predicted_fpts,
+        "actual_fpts": None,
+        "week": payload.week, "season": payload.season,
+        "source": payload.source,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "settled_at": None,
+    }
+    await db.predictions.insert_one({**doc})
+    return doc
+
+
+@api.get("/predictions/stats")
+async def prediction_stats():
+    """Return self-learning accuracy summary: total predictions, settled, MAE per position."""
+    pipeline = [
+        {"$match": {"actual_fpts": {"$ne": None}}},
+        {"$group": {
+            "_id": "$position",
+            "n": {"$sum": 1},
+            "mae_sum": {"$sum": {"$abs": {"$subtract": ["$predicted_fpts", "$actual_fpts"]}}},
+            "bias_sum": {"$sum": {"$subtract": ["$predicted_fpts", "$actual_fpts"]}},
+        }},
+    ]
+    rows = await db.predictions.aggregate(pipeline).to_list(length=100)
+    by_pos = {}
+    for r in rows:
+        n = max(r["n"], 1)
+        by_pos[r["_id"]] = {
+            "n": r["n"],
+            "mae": round(r["mae_sum"] / n, 2),
+            "bias": round(r["bias_sum"] / n, 2),  # positive = over-predicted
+        }
+    total = await db.predictions.count_documents({})
+    settled = await db.predictions.count_documents({"actual_fpts": {"$ne": None}})
+    return {
+        "total": total, "settled": settled, "pending": total - settled,
+        "by_position": by_pos,
+    }
+
+
+@api.post("/predictions/settle")
+async def settle_predictions(request: Request):
+    """When new seasonal data is available, score open predictions (admin only)."""
+    user = await require_user(request, db)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    open_preds = await db.predictions.find({"actual_fpts": None}, {"_id": 0}).to_list(length=10000)
+    settled = 0
+    for pred in open_preds:
+        p = await db.players.find_one({"id": pred["player_id"]}, {"_id": 0})
+        if not p:
+            continue
+        # Match by season if specified, else most recent season
+        season = pred.get("season")
+        target = None
+        for s in p.get("seasons", []):
+            if season and s.get("season") == season:
+                target = s
+                break
+        if target is None and p.get("seasons"):
+            target = max(p["seasons"], key=lambda s: s.get("season", 0))
+        if target:
+            actual = target.get(f"fpts_per_game_{pred['scoring']}", 0)
+            await db.predictions.update_one(
+                {"id": pred["id"]},
+                {"$set": {"actual_fpts": actual, "settled_at": datetime.now(timezone.utc).isoformat()}},
+            )
+            settled += 1
+    return {"settled": settled}
+
+
+# ---------- This Week's Edge ----------
+@api.get("/this-week")
+async def this_week(scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"):
+    """Aggregate top 10 best plays + top 5 fades for the upcoming week."""
+    cursor = db.players.find({"position": {"$in": ["QB", "RB", "WR", "TE"]}}, {"_id": 0, "news": 0})
+    items = await cursor.to_list(length=2000)
+    items = [_attach_current_season(p, None, scoring) for p in items]
+    items = [p for p in items if p.get("current_season")]
+
+    scored = []
+    for p in items:
+        score, factors = _player_lineup_score(p, scoring)
+        info = get_next_opponent(p.get("team") or "")
+        scored.append({
+            "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
+            "tag": p.get("tag"),
+            "lineup_score": score, "factors": factors,
+            "opponent": info["opponent"] if info else None,
+            "matchup_score": factors["matchup_score"],
+            "current_fpts_per_game": p.get("current_fpts_per_game"),
+            "news_search_url": player_news_search_url(p["name"]),
+        })
+
+    # Plays = high matchup_score + decent fppg
+    plays = sorted(
+        [p for p in scored if (p["current_fpts_per_game"] or 0) >= 8],
+        key=lambda x: x["matchup_score"] + (x["current_fpts_per_game"] or 0) / 5,
+        reverse=True,
+    )[:10]
+
+    # Fades = elite/breakout players in tough matchups
+    fades = sorted(
+        [p for p in scored if p.get("tag") in ("elite", "breakout") and p["matchup_score"] < 0],
+        key=lambda x: x["matchup_score"],
+    )[:5]
+
+    return {"scoring": scoring, "plays": plays, "fades": fades}
+
+
+# ---------- News URL helper ----------
+@api.get("/players/{player_id}/news-url")
+async def news_url(player_id: str):
+    p = await db.players.find_one({"id": player_id}, {"_id": 0, "name": 1})
+    if not p:
+        raise HTTPException(404, "Player not found")
+    return {"url": player_news_search_url(p["name"])}
+# ---------- Rookies ----------
+@api.get("/rookies")
+async def list_rookies(scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"):
+    """Latest-class rookies. Pulled from rosters where years_exp==0 — includes 2025 rookies even when seasonal stats not yet published."""
+    cursor = db.players.find({
+        "rookie_info": {"$exists": True, "$ne": None},
+    }, {"_id": 0})
+    items = await cursor.to_list(length=500)
+
+    if not items:
+        return {"count": 0, "items": []}
+
+    # Determine the latest rookie class year, return only those rookies
+    max_year = max((p.get("rookie_info", {}).get("rookie_year", 0) for p in items), default=0)
+    items = [p for p in items if (p.get("rookie_info") or {}).get("rookie_year") == max_year]
+    items = [_attach_current_season(p, None, scoring) for p in items]
+
+    items.sort(key=lambda p: (p.get("rookie_info") or {}).get("draft_number") or 999)
+
+    out = []
+    for p in items:
+        info = get_next_opponent(p.get("team") or "")
+        opp = info["opponent"] if info else None
+        rinfo = p.get("rookie_info") or {}
+        dn = rinfo.get("draft_number") or 999
+        outlook_label = "elite_landing" if dn <= 32 else "sleeper" if dn <= 100 else "deep_dart"
+        out.append({
+            "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
+            "age": p.get("age"), "tag": p.get("tag"),
+            "rookie_info": rinfo,
+            "rookie_year": rinfo.get("rookie_year"),
+            "draft_number": rinfo.get("draft_number"),
+            "draft_round": _draft_round(rinfo.get("draft_number")),
+            "college": rinfo.get("college"),
+            "outlook_label": outlook_label,
+            "next_opponent": opp,
+            "matchup_def_rank": get_def_rank(opp, p["position"]) if opp else None,
+            "current_fpts_per_game": p.get("current_fpts_per_game"),
+            "news_search_url": player_news_search_url(p["name"]),
+        })
+    return {"count": len(out), "rookie_year": max_year, "items": out}
+
+
+def _draft_round(dn: Optional[int]) -> Optional[int]:
+    if not dn:
+        return None
+    return min(7, ((dn - 1) // 32) + 1)
+
+
+
 
 
 # ---------- Defense rankings ----------
@@ -568,7 +862,12 @@ async def startup():
     await db.players.create_index("position")
     await db.players.create_index("team")
     await db.players.create_index("tag", sparse=True)
+    await db.players.create_index("experience", sparse=True)
     await db.rankings.create_index("user_id")
+    await db.lineups.create_index("user_id")
+    await db.predictions.create_index("player_id")
+    await db.predictions.create_index("user_id", sparse=True)
+    await db.predictions.create_index("settled_at", sparse=True)
     await db.outlooks.create_index([("player_id", 1), ("scoring", 1)], unique=True)
 
     # Seed admin

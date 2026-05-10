@@ -28,11 +28,13 @@ export default function Navbar() {
 
         <nav className="hidden md:flex items-center gap-1">
           <NavLink to="/stats" className={linkClass} data-testid="nav-stats">Stats</NavLink>
+          <NavLink to="/this-week" className={linkClass} data-testid="nav-this-week">This Week</NavLink>
           <NavLink to="/lineup" className={linkClass} data-testid="nav-lineup">Lineup AI</NavLink>
           <NavLink to="/start-sit" className={linkClass} data-testid="nav-start-sit">Start / Sit</NavLink>
+          <NavLink to="/rookies" className={linkClass} data-testid="nav-rookies">Rookies</NavLink>
           <NavLink to="/sleepers-busts" className={linkClass} data-testid="nav-sleepers">Sleepers</NavLink>
           {user && user !== false && (
-            <NavLink to="/my-rankings" className={linkClass} data-testid="nav-rankings">Rankings</NavLink>
+            <NavLink to="/my-rankings" className={linkClass} data-testid="nav-rankings">My Lab</NavLink>
           )}
         </nav>
 

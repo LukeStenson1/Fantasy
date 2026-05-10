@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, RefreshCcw, Sparkles, Newspaper } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, ExternalLink, RefreshCcw, Sparkles, Newspaper } from "lucide-react";
 import { PositionBadge, TagBadge } from "./Badges";
 import { api } from "../lib/api";
 import { Button } from "./ui/button";
@@ -247,16 +247,35 @@ function ExpandedContent({ player, scoring }) {
           <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800">
             <Newspaper className="w-4 h-4 text-slate-400" />
             <h3 className="font-display font-bold text-white">Team News & Insights</h3>
+            {full.news_search_url && (
+              <a
+                href={full.news_search_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                data-testid={`news-search-link-${player.id}`}
+              >
+                Latest news <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
           <div className="p-4">
             {(full.news || []).length === 0 && (
-              <p className="text-sm text-slate-500">No indexed news. AI outlook synthesizes recent context from stats trajectory.</p>
+              <p className="text-sm text-slate-500">
+                No indexed beat-reporter news yet. Click "Latest news" above to see real headlines from credible NFL sources, or generate the AI Outlook for trajectory-based analysis.
+              </p>
             )}
             <ul className="space-y-3">
               {(full.news || []).map((n, i) => (
                 <li key={i} className="text-sm">
                   <div className="text-[10px] font-mono-tab text-slate-500 mb-0.5">{n.date} · <span className="font-bold uppercase">{n.source}</span></div>
-                  <div className="font-bold text-white">{n.headline}</div>
+                  {n.url ? (
+                    <a href={n.url} target="_blank" rel="noopener noreferrer" className="font-bold text-white hover:text-emerald-400">
+                      {n.headline} <ExternalLink className="inline w-3 h-3" />
+                    </a>
+                  ) : (
+                    <div className="font-bold text-white">{n.headline}</div>
+                  )}
                   <div className="text-slate-400">{n.snippet}</div>
                 </li>
               ))}

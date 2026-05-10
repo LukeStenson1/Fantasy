@@ -3,7 +3,13 @@ import Navbar from "../components/Navbar";
 import { api } from "../lib/api";
 import { PositionBadge, TagBadge } from "../components/Badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Sparkles, Trophy, Users } from "lucide-react";
+import { Sparkles, Trophy, Users, Save } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import AdSlot from "../components/AdSlot";
 
 const SCORINGS = [
   { v: "half_ppr", l: "Half PPR" },

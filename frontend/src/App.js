@@ -10,6 +10,8 @@ import Register from "./pages/Register";
 import MyRankings from "./pages/MyRankings";
 import Lineup from "./pages/Lineup";
 import StartSit from "./pages/StartSit";
+import Rookies from "./pages/Rookies";
+import ThisWeek from "./pages/ThisWeek";
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
             <Route path="/lineup" element={<Lineup />} />
             <Route path="/start-sit" element={<StartSit />} />
             <Route path="/sleepers-busts" element={<SleepersBusts />} />
+            <Route path="/rookies" element={<Rookies />} />
+            <Route path="/this-week" element={<ThisWeek />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/my-rankings" element={<MyRankings />} />

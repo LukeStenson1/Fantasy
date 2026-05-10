@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
 import { ArrowRight, BarChart3, Flame, Sparkles, TrendingUp, Trophy, Wand2 } from "lucide-react";
 import { PositionBadge, TagBadge } from "../components/Badges";
+import AdSlot from "../components/AdSlot";
 
 export default function Home() {
   const [summary, setSummary] = useState({ total_players: 0, data_seasons: [], last_refresh: null });
@@ -77,20 +78,26 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-3">◆ The Toolkit</div>
         <h2 className="font-display text-3xl sm:text-4xl font-black tracking-tight text-white mb-12 max-w-2xl">Everything you need to win the week.</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <FeatureCard title="Stats Browser" desc="Filter & sort every fantasy-relevant player across multiple seasons. Click any row for the full profile, AI outlook, and team news." icon={<BarChart3 className="w-5 h-5" />} to="/stats" testid="feature-stats" />
-          <FeatureCard title="Lineup AI" desc="Auto-built starting lineup using composite Lab Score: production, matchup, availability, and trend." icon={<Wand2 className="w-5 h-5" />} to="/lineup" testid="feature-lineup" highlight />
+          <FeatureCard title="This Week's Edge" desc="Top 10 plays + top 5 fades for the upcoming week. Drop it in your league chat." icon={<Flame className="w-5 h-5" />} to="/this-week" testid="feature-this-week" highlight />
+          <FeatureCard title="Lineup AI" desc="Auto-built starting lineup using composite Lab Score: production, real matchup, availability, and trend." icon={<Wand2 className="w-5 h-5" />} to="/lineup" testid="feature-lineup" />
           <FeatureCard title="Start / Sit" desc="Add the players on your roster — we tell you exactly who to start this week with full reasoning." icon={<Trophy className="w-5 h-5" />} to="/start-sit" testid="feature-startsit" />
-          <FeatureCard title="Sleepers & Busts" desc="Pre-tagged breakouts, sleepers, elites, and bust risks based on stat trajectories." icon={<Flame className="w-5 h-5" />} to="/sleepers-busts" testid="feature-radar" />
+          <FeatureCard title="Rookie Outlooks" desc="Latest NFL draft class with AI-generated year-1 outlooks: scheme fit, projected role, target share." icon={<TrendingUp className="w-5 h-5" />} to="/rookies" testid="feature-rookies" />
+          <FeatureCard title="Sleepers & Busts" desc="Pre-tagged breakouts, sleepers, elites, and bust risks based on stat trajectories." icon={<Sparkles className="w-5 h-5" />} to="/sleepers-busts" testid="feature-radar" />
         </div>
       </section>
 
       {/* MOVERS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <MoverList title="Breakout Candidates" players={movers.breakouts} accent="emerald" testid="mover-breakouts" />
           <MoverList title="Bust Risks" players={movers.busts} accent="red" testid="mover-busts" />
         </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <AdSlot slot="home-bottom" />
       </section>
 
       <footer className="border-t border-slate-800 py-8">
