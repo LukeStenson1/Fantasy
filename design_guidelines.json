@@ -1,0 +1,76 @@
+{
+  "theme_and_archetype": {
+    "theme": "Light",
+    "archetype": "4 - Swiss & High-Contrast",
+    "reasoning": "A fantasy football reference site requires maximum legibility, high data density, and clear visual hierarchy. The Swiss Brutalist/High-Contrast approach ensures tabular data is the hero, removing unnecessary decorative elements (like purple gradients) to create an authoritative, professional analytics tool."
+  },
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F8FAFC",
+    "surface_alt": "#F1F5F9",
+    "text_primary": "#0A0A0A",
+    "text_secondary": "#475569",
+    "border": "#E2E8F0",
+    "primary": "#0A0A0A",
+    "position_colors": {
+      "QB": { "bg": "bg-red-50", "text": "text-red-700", "border": "border-red-200" },
+      "RB": { "bg": "bg-blue-50", "text": "text-blue-700", "border": "border-blue-200" },
+      "WR": { "bg": "bg-emerald-50", "text": "text-emerald-700", "border": "border-emerald-200" },
+      "TE": { "bg": "bg-amber-50", "text": "text-amber-700", "border": "border-amber-200" },
+      "K": { "bg": "bg-pink-50", "text": "text-pink-700", "border": "border-pink-200" },
+      "DEF": { "bg": "bg-slate-100", "text": "text-slate-700", "border": "border-slate-300" }
+    }
+  },
+  "typography": {
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "IBM Plex Sans",
+    "mono_font": "JetBrains Mono",
+    "sizes": {
+      "h1": "text-4xl sm:text-5xl font-black tracking-tight leading-none",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight",
+      "h3": "text-xl font-bold tracking-tight",
+      "body": "text-base text-slate-700 leading-relaxed",
+      "data_table": "text-sm font-medium tracking-wide",
+      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-slate-500"
+    },
+    "rules": "Never use Inter for headings. Use JetBrains Mono for all numeric stats in tables to ensure perfect vertical alignment of digits."
+  },
+  "spacing_and_layout": {
+    "container_padding": "p-6 md:p-8 lg:p-12",
+    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+    "table_layout": "w-full text-left border-collapse",
+    "bento_spacing": "Use tight gaps (gap-4) for data-heavy sections to mimic a control room, but generous padding (p-8) for overall page containers."
+  },
+  "components": {
+    "tables": "Premium data-dense tables inspired by Pro Football Reference but modernized. Must have sticky headers with backdrop-blur-md (bg-white/90). Use subtle row striping (even:bg-slate-50). Hover state must highlight the entire row (hover:bg-slate-100). Use 1px border-slate-200 to separate columns slightly.",
+    "position_badges": "Small pills (px-2.5 py-0.5 rounded-md text-xs font-bold 1px border) using the position_colors defined above. They immediately identify player role in dense lists.",
+    "cards": "Flat solid background (bg-white), 1px border (border-slate-200), max 8px border-radius (rounded-md). No drop shadows by default. Focus on crisp, sharp edges.",
+    "buttons": "Square or slight rounded-md. Primary buttons are solid black (bg-black text-white hover:bg-slate-800). Secondary are outline (border-slate-300 hover:bg-slate-50).",
+    "navigation": "Solid white background with a crisp 1px bottom border. Clean, left-aligned logo. Horizontal nav items. No hamburgers on desktop."
+  },
+  "visual_enhancers": {
+    "borders": "Grid borders ('The Technical Look'). Expose the skeleton for a data-first feel by keeping structural borders visible.",
+    "glassmorphism": "Restricted solely to sticky table headers or floating action bars to ensure underlying data remains somewhat visible on scroll but highly legible.",
+    "empty_states": "Use the player action silhouette image as a subtle watermark or faint background element (opacity-10) for empty states or missing data."
+  },
+  "media_and_images": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1673846446973-bad1f01794f3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHwxfHxmb290YmFsbCUyMHN0YWRpdW0lMjBsaWdodHMlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3ODM3OTc0M3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Stadium lights background. Use as a header banner for the main site or team pages, but MUST be covered with a heavy white overlay (bg-white/80 to bg-white/90) to keep high-contrast text perfectly legible."
+    },
+    "player_action_silhouette": {
+      "url": "https://images.unsplash.com/photo-1618787113620-fc01359c1c78?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwyfHxmb290YmFsbCUyMHBsYXllciUyMGFjdGlvbiUyMHNpbGhvdWV0dGV8ZW58MHx8fHwxNzc4Mzc5NzQzfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Silhouette player action. Ideal for player profile headers when a specific player photo is unavailable. Blend with multiply or high transparency."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install and configure 'Cabinet Grotesk' for headings, 'IBM Plex Sans' for body, and 'JetBrains Mono' for numeric table cells.",
+    "Install Phosphor Icons or Lucide-react for sharp, consistent UI icons.",
+    "Build a robust, filterable data table component mimicking Pro Football Reference. Include sortable column headers, sticky headers, and tabular numbers.",
+    "Implement the fantasy position color coding consistently across badges, charts, and row highlights. Do not use generic colors for positions.",
+    "Use Shadcn UI for complex interactive logic (Dropdowns for season/team filters, Tabs for passing/rushing/receiving stats) but customize styling to match the Swiss Brutalist flat/bordered aesthetic.",
+    "Integrate a 'Sleeper/Bust' visual indicator in the tables (e.g., an icon or subtle background tint on the specific cell).",
+    "Ensure all interactive elements have data-testid attributes (e.g., data-testid='filter-season-2025').",
+    "CRITICAL: Avoid the 'AI-slop purple gradient' look entirely. Maintain strict adherence to the High-Contrast/Swiss monochrome palette with strategic position color highlights."
+  ]
+}
