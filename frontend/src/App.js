@@ -10,7 +10,6 @@ import Register from "./pages/Register";
 import MyRankings from "./pages/MyRankings";
 import Lineup from "./pages/Lineup";
 import Rookies from "./pages/Rookies";
-import ThisWeek from "./pages/ThisWeek";
 import Trades from "./pages/Trades";
 
 function App() {
@@ -20,7 +19,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/this-week" element={<ThisWeek />} />
+            <Route path="/this-week" element={<Navigate to="/" replace />} />
             <Route path="/lineup" element={<Lineup />} />
             <Route path="/start-sit" element={<Navigate to="/lineup" replace />} />
             <Route path="/trades" element={<Trades />} />

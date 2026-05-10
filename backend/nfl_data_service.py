@@ -27,6 +27,26 @@ FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 # Per-position player count caps (top-N by fantasy points in latest season)
 TOP_N = {"QB": 32, "RB": 75, "WR": 75, "TE": 35, "K": 35}
 
+# Team-code normalization — nflverse uses slightly different codes across data sources.
+# Canonical form aligns with our DvP map + schedule + ESPN injuries map (LAR not LA, etc.).
+TEAM_CODE_ALIASES = {
+    "LA": "LAR",   # Rams — some rosters use bare "LA"
+    "JAC": "JAX",  # Jaguars
+    "STL": "LAR",  # Old St. Louis Rams (defunct, defensive map safety)
+    "SD": "LAC",   # Old San Diego Chargers (defunct)
+    "OAK": "LV",   # Old Oakland Raiders
+    "WSH": "WAS",  # ESPN sometimes uses WSH
+    "ARZ": "ARI",  # Old Arizona alt code
+}
+
+
+def normalize_team(code) -> str:
+    """Normalize NFL team code variants to our canonical form."""
+    if not code:
+        return ""
+    c = str(code).strip().upper()
+    return TEAM_CODE_ALIASES.get(c, c)
+
 # 32 NFL team defenses for fantasy lineup support
 NFL_TEAMS = [
     ("ARI", "Arizona Cardinals"), ("ATL", "Atlanta Falcons"), ("BAL", "Baltimore Ravens"),
@@ -166,12 +186,12 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                 "ext_id": pid,
                 "name": str(name),
                 "position": str(pos),
-                "team": str(team) if not pd.isna(team) else "",
+                "team": normalize_team(team) if not pd.isna(team) else "",
                 "birth_date": row.get("birth_date"),
                 "seasons": [],
             })
             if not pd.isna(team):
-                entry["team"] = str(team)
+                entry["team"] = normalize_team(team)
             entry["seasons"].append(_season_record(row, season))
 
     # ROOKIES: pull rookies (years_exp==0) from each season's roster — even when
@@ -198,10 +218,36 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                     "ext_id": pid,
                     "name": str(row.get("player_name") or ""),
                     "position": str(row.get("position") or ""),
-                    "team": str(row.get("team") or ""),
+                    "team": normalize_team(row.get("team") or ""),
                     "birth_date": row.get("birth_date"),
                     "seasons": [],
                 }
+
+    # LATEST-ROSTER TEAM OVERLAY — critical for keeping team/position current
+    # even when the latest season's seasonal stats haven't been published yet by nflverse
+    # (e.g., free-agency moves and trades show in the new roster but stats lag months).
+    # Always trust the highest-season roster as the source of truth for `team` and `position`.
+    available_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
+    if available_seasons:
+        latest_season = available_seasons[-1]
+        latest_roster = roster_dfs[latest_season].drop_duplicates(subset=["player_id"], keep="last")
+        # Normalize team codes: nflverse sometimes uses "LA" for Rams — keep as-is, our DvP/schedule data uses the same code.
+        for _, row in latest_roster.iterrows():
+            pid = row.get("player_id")
+            if not pid or pd.isna(pid):
+                continue
+            if pid not in all_player_seasons:
+                continue
+            new_team = row.get("team")
+            if not pd.isna(new_team) and new_team:
+                all_player_seasons[pid]["team"] = normalize_team(new_team)
+            new_pos = row.get("position")
+            if not pd.isna(new_pos) and new_pos:
+                all_player_seasons[pid]["position"] = str(new_pos)
+            new_bd = row.get("birth_date")
+            if new_bd is not None and not (isinstance(new_bd, float) and pd.isna(new_bd)):
+                all_player_seasons[pid]["birth_date"] = new_bd
+        logger.info(f"Latest-roster overlay applied from {latest_season} season ({len(latest_roster)} rows)")
 
     # Filter to top-N per position based on best-of-any-season fpts.
     # Rookies (no seasons yet) included separately, ranked by inverse draft_number.
