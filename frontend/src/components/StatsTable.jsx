@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, ExternalLink, RefreshCcw, Sparkles, Newspaper } from "lucide-react";
-import { PositionBadge, TagBadge } from "./Badges";
+import { PositionBadge, TagBadge, InjuryBadge } from "./Badges";
 import { api } from "../lib/api";
 import { Button } from "./ui/button";
 
@@ -106,6 +106,7 @@ function PlayerRow({ player, expanded, onToggle, scoring }) {
           <div className="flex items-center gap-2">
             <span data-testid={`player-name-${p.id}`}>{p.name}</span>
             <TagBadge tag={p.tag} />
+            <InjuryBadge status={p.injury_status} short={p.injury_short} />
           </div>
         </td>
         <td><PositionBadge position={p.position} /></td>

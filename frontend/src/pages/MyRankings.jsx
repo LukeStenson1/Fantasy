@@ -100,10 +100,17 @@ export default function MyRankings() {
             </div>
             <p className="text-sm text-slate-400 mb-3">Re-pull live data from nflverse, then score open predictions so the Lab learns from new outcomes.</p>
             {dataStatus?.last_refresh && (
-              <div className="text-xs font-mono-tab text-slate-500 mb-3" data-testid="last-refresh-info">
-                Last refresh: <span className="text-emerald-300">{relativeTime(dataStatus.last_refresh.value)}</span>
+              <div className="text-xs font-mono-tab text-slate-500 mb-1" data-testid="last-refresh-info">
+                Stats refresh: <span className="text-emerald-300">{relativeTime(dataStatus.last_refresh.value)}</span>
                 {dataStatus.last_refresh.seasons && <> · seasons: <span className="text-slate-300">{dataStatus.last_refresh.seasons.join(", ")}</span></>}
                 {" · "}<span className="text-slate-300">{dataStatus.player_count} players</span>
+              </div>
+            )}
+            {dataStatus?.last_injury_refresh && (
+              <div className="text-xs font-mono-tab text-slate-500 mb-3" data-testid="last-injury-info">
+                Injuries refresh: <span className="text-emerald-300">{relativeTime(dataStatus.last_injury_refresh.value)}</span>
+                {" · "}<span className="text-amber-300">{dataStatus.injured_count || 0} players flagged</span>
+                {" · "}<span className="text-slate-500">{dataStatus.last_injury_refresh.fetched} ESPN entries</span>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
@@ -118,6 +125,18 @@ export default function MyRankings() {
                 }}
                 className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold" data-testid="admin-refresh-btn">
                 Refresh Data from nflverse
+              </Button>
+              <Button
+                onClick={async () => {
+                  toast.info("Pulling injuries from ESPN…");
+                  try {
+                    const { data } = await api.post("/admin/refresh-injuries");
+                    toast.success(`${data.matched} players flagged · ${data.fetched} ESPN entries scanned`);
+                    const st = await api.get("/admin/data-status"); setDataStatus(st.data);
+                  } catch { toast.error("Injury refresh failed"); }
+                }}
+                className="bg-red-500 hover:bg-red-400 text-white font-bold" data-testid="admin-injuries-btn">
+                Refresh ESPN Injuries
               </Button>
               <Button
                 onClick={async () => {

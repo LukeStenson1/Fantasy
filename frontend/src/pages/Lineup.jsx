@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { PositionBadge, TagBadge } from "../components/Badges";
+import { PositionBadge, TagBadge, InjuryBadge } from "../components/Badges";
 import { Plus, X, Trophy, Sparkles, Save, ExternalLink, Wand2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -268,6 +268,7 @@ function SlotCard({ slotLabel, player }) {
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <PositionBadge position={p.position} />
         <TagBadge tag={p.tag} />
+        <InjuryBadge status={p.factors?.injury_status} />
       </div>
       <div className="font-display font-bold text-lg text-white leading-tight">{p.name}</div>
       <div className="text-xs font-mono-tab text-slate-400">{p.team}</div>

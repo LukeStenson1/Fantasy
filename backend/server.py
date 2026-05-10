@@ -31,6 +31,7 @@ from nfl_data_service import (
     DEF_VS_POS_2024, get_next_opponent, get_next_opponent_team,
     player_news_search_url,
 )
+from espn_injuries import refresh_injuries, injury_penalty
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("ffref")
@@ -336,6 +337,8 @@ def _reasoning_text(p: dict, factors: dict) -> str:
             parts.append(f"tough matchup vs {opp} (#{rank} D vs {p['position']})")
         else:
             parts.append(f"neutral matchup vs {opp} (#{rank} D vs {p['position']})")
+    if factors.get("injury_status"):
+        parts.append(f"injury: {factors['injury_status']}")
     if factors["availability"] < 0:
         parts.append("availability concern (missed games)")
     if factors["tag"] == "elite":
@@ -917,6 +920,15 @@ async def upload_csv(request: Request, file: UploadFile = File(...)):
 
 
 # ---------- Admin: refresh data ----------
+@api.post("/admin/refresh-injuries")
+async def refresh_injuries_ep(request: Request):
+    """Pull live injuries from ESPN and update player records + Lab Score."""
+    user = await require_user(request, db)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    return await refresh_injuries(db)
+
+
 @api.post("/admin/refresh-data")
 async def refresh_data(request: Request, force: bool = True):
     """Re-pull latest player data from nfl-data-py (nflverse)."""
@@ -930,8 +942,15 @@ async def refresh_data(request: Request, force: bool = True):
 @api.get("/admin/data-status")
 async def data_status():
     meta = await db.meta.find_one({"key": "last_refresh"}, {"_id": 0})
+    inj_meta = await db.meta.find_one({"key": "last_injury_refresh"}, {"_id": 0})
     count = await db.players.count_documents({})
-    return {"last_refresh": meta, "player_count": count}
+    injured = await db.players.count_documents({"injury_status": {"$exists": True, "$ne": None}})
+    return {
+        "last_refresh": meta,
+        "last_injury_refresh": inj_meta,
+        "player_count": count,
+        "injured_count": injured,
+    }
 
 
 # ---------- Health ----------
