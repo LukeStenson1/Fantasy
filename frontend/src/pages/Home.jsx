@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
-import { ArrowRight, ArrowRightLeft, BarChart3, Flame, Sparkles, TrendingUp, Trophy, Wand2 } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Activity, BarChart3, Database, Flame, Sparkles, TrendingUp, Trophy, Wand2 } from "lucide-react";
 import { PositionBadge, TagBadge, MatchupBadge } from "../components/Badges";
 import AdSlot from "../components/AdSlot";
 
@@ -120,10 +120,10 @@ export default function Home() {
         <AdSlot slot="home-bottom" />
       </section>
 
-      <footer className="border-t border-slate-800 py-8">
+      <footer className="border-t border-slate-800 py-8" data-testid="home-footer">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-sm text-slate-500 font-mono-tab">FantasyLab · half-ppr default · 12-team snake</div>
-          <div className="text-xs text-slate-600">Data via nflverse · refreshes daily · auto-rolls to next season when available.</div>
+          <FreshnessBadge summary={summary} />
         </div>
       </footer>
     </div>
@@ -227,6 +227,39 @@ function MatchupColumn({ pos, data }) {
         ))}
         {tough.length === 0 && <li className="px-2 py-1.5 text-xs text-slate-600">—</li>}
       </ul>
+    </div>
+  );
+}
+
+
+function relTime(iso) {
+  if (!iso) return "—";
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function FreshnessBadge({ summary }) {
+  const seasons = summary?.data_seasons || [];
+  const seasonStr = seasons.length ? `${seasons[0]}–${seasons[seasons.length - 1]}` : "—";
+  const stats = relTime(summary?.last_refresh);
+  const inj = relTime(summary?.last_injury_refresh);
+  const fresh = summary?.last_refresh && (Date.now() - new Date(summary.last_refresh).getTime()) < 36 * 3600 * 1000;
+  const dot = fresh ? "bg-emerald-400" : "bg-amber-400";
+  return (
+    <div className="flex items-center gap-3 text-[11px] font-mono-tab text-slate-500" data-testid="freshness-badge">
+      <span className={`inline-flex items-center gap-1.5`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${dot} animate-pulse`} />
+        <span className="uppercase tracking-[0.2em] text-[10px] font-bold text-slate-400">Live</span>
+      </span>
+      <span className="flex items-center gap-1" title="Seasons of stats currently loaded from nflverse">
+        <Database className="w-3 h-3" /> Stats {seasonStr} · {stats}
+      </span>
+      <span className="flex items-center gap-1" title="Last ESPN injury sync">
+        <Activity className="w-3 h-3 text-emerald-400" /> Injuries {inj}
+      </span>
     </div>
   );
 }

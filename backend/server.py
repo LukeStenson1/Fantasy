@@ -1118,6 +1118,7 @@ async def health():
 @api.get("/stats/summary")
 async def stats_summary():
     meta = await db.meta.find_one({"key": "last_refresh"}, {"_id": 0})
+    inj_meta = await db.meta.find_one({"key": "last_injury_refresh"}, {"_id": 0})
     seasons = (meta or {}).get("seasons") if meta else []
     return {
         "total_players": await db.players.count_documents({}),
@@ -1125,6 +1126,8 @@ async def stats_summary():
         "total_rankings": await db.rankings.count_documents({}),
         "data_seasons": seasons or [],
         "last_refresh": (meta or {}).get("value") if meta else None,
+        "last_injury_refresh": (inj_meta or {}).get("value") if inj_meta else None,
+        "injuries_matched": (inj_meta or {}).get("matched") if inj_meta else None,
     }
 
 
