@@ -233,3 +233,123 @@ class TestOutlook:
         assert r.status_code == 200
         d = r.json()
         assert d is not None
+        assert d.get("outlook") and isinstance(d["outlook"], str) and len(d["outlook"]) > 20
+
+
+# ==== Iteration 2 features ====
+class TestLineup:
+    def test_lineup_suggest(self, session):
+        r = session.get(f"{API}/lineup/suggest", params={"scoring": "half_ppr"})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["scoring"] == "half_ppr"
+        assert "starters" in d and "bench_alternatives" in d
+        starters = d["starters"]
+        # 1 QB / 2 RB / 2 WR / 1 TE / 1 FLEX
+        assert len(starters["QB"]) == 1
+        assert len(starters["RB"]) == 2
+        assert len(starters["WR"]) == 2
+        assert len(starters["TE"]) == 1
+        assert len(starters["FLEX"]) == 1
+        # FLEX must be RB/WR/TE
+        flex = starters["FLEX"][0]
+        assert flex["position"] in ("RB", "WR", "TE")
+        # Each starter has lineup_score, reasoning, factors
+        for slot, players in starters.items():
+            for p in players:
+                assert "lineup_score" in p and isinstance(p["lineup_score"], (int, float))
+                assert p.get("reasoning") and isinstance(p["reasoning"], str)
+                assert "factors" in p and "fppg" in p["factors"]
+        # No duplicates across starters
+        starter_ids = [p["id"] for arr in starters.values() for p in arr]
+        assert len(starter_ids) == len(set(starter_ids))
+
+
+class TestStartSit:
+    def test_start_sit_basic(self, session):
+        items = _items(session.get(f"{API}/players", params={"position": "RB"}).json())[:3]
+        ids = [p["id"] for p in items]
+        r = session.post(f"{API}/start-sit", json={"player_ids": ids, "scoring": "half_ppr"})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "ranked" in d and "recommendation" in d
+        assert len(d["ranked"]) == 3
+        # recommendation is the first ranked
+        assert d["recommendation"]["id"] == d["ranked"][0]["id"]
+        # sorted desc
+        scores = [p["lineup_score"] for p in d["ranked"]]
+        assert scores == sorted(scores, reverse=True)
+        for p in d["ranked"]:
+            assert p.get("reasoning") and "factors" in p
+
+    def test_start_sit_slot_filter(self, session):
+        rbs = _items(session.get(f"{API}/players", params={"position": "RB"}).json())[:2]
+        wrs = _items(session.get(f"{API}/players", params={"position": "WR"}).json())[:2]
+        ids = [p["id"] for p in rbs + wrs]
+        r = session.post(f"{API}/start-sit", json={"player_ids": ids, "scoring": "half_ppr", "slot": "RB"})
+        assert r.status_code == 200
+        d = r.json()
+        assert all(p["position"] == "RB" for p in d["ranked"])
+        # FLEX
+        r2 = session.post(f"{API}/start-sit", json={"player_ids": ids, "slot": "FLEX"})
+        d2 = r2.json()
+        assert all(p["position"] in ("RB", "WR", "TE") for p in d2["ranked"])
+
+    def test_start_sit_empty(self, session):
+        r = session.post(f"{API}/start-sit", json={"player_ids": []})
+        assert r.status_code == 400
+
+
+class TestDefenseRankings:
+    def test_def_rankings(self, session):
+        r = session.get(f"{API}/defense-rankings")
+        assert r.status_code == 200
+        d = r.json()
+        for pos in ("QB", "RB", "WR", "TE"):
+            assert pos in d
+            assert isinstance(d[pos], dict)
+            # Each team should have an integer rank
+            for team, rank in d[pos].items():
+                assert isinstance(rank, int) and 1 <= rank <= 32
+
+
+class TestPlayerMatchup:
+    def test_player_has_matchup_fields(self, session):
+        items = _items(session.get(f"{API}/players").json())
+        # Find a player with a non-empty team
+        target = next((p for p in items if p.get("team")), None)
+        assert target is not None
+        r = session.get(f"{API}/players/{target['id']}")
+        assert r.status_code == 200
+        d = r.json()
+        # next_opponent may be None for some teams; if present, matchup_def_rank should be set
+        if d.get("next_opponent"):
+            assert "matchup_def_rank" in d
+            assert isinstance(d["matchup_def_rank"], int)
+
+
+class TestAdminDataStatus:
+    def test_data_status(self, session):
+        r = session.get(f"{API}/admin/data-status")
+        assert r.status_code == 200
+        d = r.json()
+        assert "player_count" in d
+        assert isinstance(d["player_count"], int)
+        assert d["player_count"] > 0
+        # last_refresh may be None on cold start; if present should be dict with value
+        assert "last_refresh" in d
+
+
+class TestPlayerCounts:
+    def test_player_counts_by_position(self, session):
+        d = {}
+        for pos in ("QB", "RB", "WR", "TE"):
+            items = _items(session.get(f"{API}/players", params={"position": pos, "limit": 1000}).json())
+            d[pos] = len(items)
+        # Expected ~32 QB, 75 RB, 75 WR, 35 TE per spec; allow some flex
+        total = sum(d.values())
+        assert total >= 150, f"Expected ~217 players, got {total}: {d}"
+        assert d["QB"] >= 20
+        assert d["RB"] >= 50
+        assert d["WR"] >= 50
+        assert d["TE"] >= 20

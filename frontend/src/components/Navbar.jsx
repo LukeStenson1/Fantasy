@@ -7,51 +7,53 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const linkBase = "text-sm font-semibold tracking-wide uppercase px-3 py-2 transition-colors";
+  const linkBase = "text-xs font-bold tracking-[0.15em] uppercase px-3 py-2 transition-colors";
   const linkClass = ({ isActive }) =>
-    `${linkBase} ${isActive ? "text-black border-b-2 border-black" : "text-slate-600 hover:text-black"}`;
+    `${linkBase} ${isActive ? "text-emerald-400 border-b-2 border-emerald-400" : "text-slate-400 hover:text-white"}`;
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-slate-200" data-testid="navbar">
+    <header className="sticky top-0 z-30 bg-[#0a0e16]/95 backdrop-blur-md border-b border-slate-800" data-testid="navbar">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2" data-testid="navbar-logo">
-          <div className="w-8 h-8 bg-black flex items-center justify-center text-white font-display font-black text-sm">
-            FF
+        <Link to="/" className="flex items-center gap-2.5 group" data-testid="navbar-logo">
+          <div className="relative w-9 h-9 flex items-center justify-center">
+            {/* FL logo: black square with emerald accent corner */}
+            <div className="absolute inset-0 bg-emerald-500 rotate-[3deg] group-hover:rotate-[6deg] transition-transform"></div>
+            <div className="absolute inset-0 bg-slate-950 border border-emerald-500/60"></div>
+            <span className="relative font-display font-black text-base text-emerald-400 tracking-tight">FL</span>
           </div>
-          <div className="font-display font-black text-lg leading-none">
-            FantasyRef<span className="text-emerald-600">.</span>
+          <div className="font-display font-black text-lg leading-none tracking-tight text-white">
+            Fantasy<span className="text-emerald-400">Lab</span>
           </div>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
           <NavLink to="/stats" className={linkClass} data-testid="nav-stats">Stats</NavLink>
-          <NavLink to="/sleepers-busts" className={linkClass} data-testid="nav-sleepers">Sleepers / Busts</NavLink>
+          <NavLink to="/lineup" className={linkClass} data-testid="nav-lineup">Lineup AI</NavLink>
+          <NavLink to="/start-sit" className={linkClass} data-testid="nav-start-sit">Start / Sit</NavLink>
+          <NavLink to="/sleepers-busts" className={linkClass} data-testid="nav-sleepers">Sleepers</NavLink>
           {user && user !== false && (
-            <NavLink to="/my-rankings" className={linkClass} data-testid="nav-rankings">My Rankings</NavLink>
+            <NavLink to="/my-rankings" className={linkClass} data-testid="nav-rankings">Rankings</NavLink>
           )}
         </nav>
 
         <div className="flex items-center gap-2">
           {user && user !== false ? (
             <>
-              <span className="hidden sm:flex items-center gap-1.5 text-sm text-slate-600" data-testid="navbar-user-email">
-                <UserIcon className="w-4 h-4" /> {user.email}
+              <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 font-mono-tab" data-testid="navbar-user-email">
+                <UserIcon className="w-3.5 h-3.5" /> {user.email}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => { await logout(); navigate("/"); }}
-                data-testid="navbar-logout-btn"
-              >
-                <LogOut className="w-4 h-4 mr-1" /> Logout
+              <Button variant="outline" size="sm" onClick={async () => { await logout(); navigate("/"); }}
+                className="border-slate-700 bg-transparent hover:bg-slate-800 text-slate-300 hover:text-white" data-testid="navbar-logout-btn">
+                <LogOut className="w-3.5 h-3.5 mr-1" /> Logout
               </Button>
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/login")} data-testid="navbar-login-btn">
+              <Button variant="ghost" size="sm" onClick={() => navigate("/login")} className="text-slate-300 hover:text-white hover:bg-slate-800" data-testid="navbar-login-btn">
                 Login
               </Button>
-              <Button size="sm" onClick={() => navigate("/register")} className="bg-black hover:bg-slate-800 text-white" data-testid="navbar-register-btn">
+              <Button size="sm" onClick={() => navigate("/register")}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold" data-testid="navbar-register-btn">
                 Sign Up
               </Button>
             </>

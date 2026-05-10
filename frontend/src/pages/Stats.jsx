@@ -30,7 +30,7 @@ export default function Stats() {
   }, []);
 
   const params = useMemo(() => ({
-    position, team, season: Number(season), scoring, search: search || undefined, limit: 300,
+    position, team, season: Number(season), scoring, search: search || undefined, limit: 500,
   }), [position, team, season, scoring, search]);
 
   useEffect(() => {
@@ -48,29 +48,28 @@ export default function Stats() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#0a0e16]">
       <Navbar />
 
-      <div className="border-b border-slate-200 bg-slate-50">
+      <div className="border-b border-slate-800 bg-slate-950/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-xs font-bold tracking-[0.2em] uppercase text-slate-500 mb-2">◆ Stats Browser</div>
-          <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight" data-testid="stats-title">Player Stats</h1>
-          <p className="text-slate-600 mt-2">Filter, sort, and slice every fantasy-relevant player across multiple seasons.</p>
+          <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-2">◆ The Lab · Stats Browser</div>
+          <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white" data-testid="stats-title">Player Stats</h1>
+          <p className="text-slate-400 mt-2 max-w-2xl">Real NFL seasonal data from nflverse · click any row for the full player profile, AI outlook, and team news.</p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Filter bar */}
-        <div className="bg-white border border-slate-200 rounded-md p-4 mb-4 flex flex-wrap items-end gap-3" data-testid="filter-bar">
+        <div className="bg-slate-950/60 border border-slate-800 rounded-md p-4 mb-4 flex flex-wrap items-end gap-3" data-testid="filter-bar">
           <div className="flex-1 min-w-[220px]">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-1.5">Search</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">Search</label>
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search player name…"
-                className="pl-9"
+                className="pl-9 bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
                 data-testid="filter-search-input"
               />
             </div>
@@ -81,31 +80,30 @@ export default function Stats() {
           <FilterSelect label="Season" value={season} onChange={setSeason} options={SEASONS} testid="filter-season" />
 
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-1.5">Scoring</label>
+            <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">Scoring</label>
             <Select value={scoring} onValueChange={setScoring}>
-              <SelectTrigger className="w-[140px]" data-testid="filter-scoring">
+              <SelectTrigger className="w-[140px] bg-slate-900 border-slate-700 text-white" data-testid="filter-scoring">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-slate-900 border-slate-700 text-white">
                 {SCORINGS.map((s) => <SelectItem key={s.v} value={s.v} data-testid={`scoring-opt-${s.v}`}>{s.l}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
-          <Button variant="outline" onClick={reset} data-testid="filter-reset-btn">
+          <Button variant="outline" onClick={reset} className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" data-testid="filter-reset-btn">
             <X className="w-4 h-4 mr-1" /> Reset
           </Button>
         </div>
 
-        {/* Result meta */}
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm text-slate-600 font-mono-tab" data-testid="results-count">
+          <div className="text-sm text-slate-400 font-mono-tab" data-testid="results-count">
             {loading ? "Loading…" : `${rows.length} players`}
           </div>
-          <div className="text-xs text-slate-500 uppercase tracking-wider">Click any column header to sort</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Click any row to expand · click headers to sort</div>
         </div>
 
-        <StatsTable rows={rows} />
+        <StatsTable rows={rows} scoring={scoring} />
       </div>
     </div>
   );
@@ -114,12 +112,12 @@ export default function Stats() {
 function FilterSelect({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-1.5">{label}</label>
+      <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">{label}</label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-[120px]" data-testid={testid}>
+        <SelectTrigger className="w-[120px] bg-slate-900 border-slate-700 text-white" data-testid={testid}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-slate-900 border-slate-700 text-white">
           {options.map((o) => (
             <SelectItem key={o} value={o} data-testid={`${testid}-opt-${o}`}>{o}</SelectItem>
           ))}

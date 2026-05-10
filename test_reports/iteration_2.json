@@ -1,0 +1,57 @@
+{
+  "summary": "Iteration 2 testing complete. Backend 30/31 pytest pass (96.7%) — only the known iter-1 season-filter bug remains. All new endpoints (lineup/suggest, start-sit, defense-rankings, admin/data-status) work correctly. Frontend dark theme + FantasyLab brand confirmed; Stats inline expansion (career + AI Outlook + News), Lineup AI with swap modal, Start/Sit search/add/decide, Sleepers/Busts (4 sections), Login + My Rankings all functional with cookie auth. Player count: 217 (32 QB / 75 RB+WR / 35 TE roughly).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/players?season=YYYY",
+        "issue": "Season filter still NOT strict (carried over from iter 1). When player has no row for requested season, _attach_current_season falls back to most-recent season instead of excluding. Repro: GET /api/players?season=2023 returns players whose current_season.season == 2024."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Stats page",
+        "issues": ["Title text 'STATS BROWSER · The Lab' uses bright-white headline on slate-950 dark bg — contrast OK. No issues found."]
+      }
+    ],
+    "data_observations": [
+      {
+        "issue": "Christian McCaffrey is absent from the 217-player nflverse dataset (search returns 0 results). Likely filtered by min-games threshold given his injury-shortened 2024 season. Not a code bug but may surprise users searching for star players.",
+        "endpoint": "GET /api/players?search=McCaffrey"
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix season filter in /app/backend/server.py _attach_current_season (lines 132-143): when `season` param explicitly provided and no row matches, set current_season=None so list_players line 170 filter drops the player. Currently falls back to max(seasons).",
+    "(Optional) Re-evaluate min-games threshold in nfl_data_service.py refresh logic so high-profile injured stars (e.g., McCaffrey) are still surfaced for 2023 data."
+  ],
+  "critical_code_review_comments": [
+    "server.py _attach_current_season (l.132-143): silent fallback to most-recent season when requested season missing — violates filter contract. Same bug as iter 1.",
+    "server.py CORS uses FRONTEND_URL env (good) but backend/.env still has CORS_ORIGINS='*' which is unused (dead config) — remove for clarity.",
+    "server.py /api/players response shape {count, items} is inconsistent with /api/teams, /api/sleepers-busts, /api/lineup/suggest which return raw lists/dicts — consider standardising envelopes.",
+    "server.py /api/admin/data-status is unauthenticated (l.534) — exposes player count + last_refresh metadata to anonymous users. Consider gating behind admin role.",
+    "server.py outlook endpoints (l.196-225): db.outlooks.insert_one mutates the doc by adding _id, then doc.pop('_id', None) is called — works but slightly fragile. Use a copy.",
+    "nfl_data_service: NEXT_OPPONENT mapping is hardcoded — when 2025 data publishes, opponent mapping may be stale; add a TODO or generate from schedule data."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_backend.py"
+  ],
+  "success_rate": {
+    "backend": "96.7% (30/31 pytest)",
+    "frontend": "100% smoke (7/7 flows: home, stats+expand, lineup+swap, start-sit search/add/decide, sleepers, login, my-rankings)"
+  },
+  "test_credentials": "admin@ffref.com/admin123 and user@ffref.com/user123 — both verified working.",
+  "seed_data_creation": "Created TEST_Player_A via CSV upload (admin auth); created+deleted TEST_Ranking via authenticated user. Test users registered with TEST_user_<ts>@example.com prefix (auto-cleanup not yet implemented but emails are time-stamped).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "31 pytest tests now cover all iter-2 endpoints (lineup, start-sit, def-rankings, data-status, matchup fields, position counts). The only failing test is TestPlayers::test_filter_season — same bug from iter 1, NOT yet fixed. Frontend uses data-testid on Start/Sit (ss-search-input, ss-result-<id>, ss-decide-btn, ss-remove-<id>) — use these. Lineup swap modal opens (verified by screenshot) but uses a portal so [role='dialog'] selector may need wait_for_timeout; use text-based 'Choose a player' or 'SWAP QB' to detect. Stats table has 218 rows (217 players + 1 header? actually 217 — limit_default=300, full set shown). Christian McCaffrey is NOT in the dataset.",
+  "rca of the issue": "Season filter bug RCA (unchanged from iter 1): server.py:132-143 _attach_current_season() does `if cur is None and seasons: cur = max(...)`. When user passes ?season=2023 and a player lacks 2023 row, code falls back to 2024 and player slips through filter. Fix: only fall back when season param was None; if explicit and missing, set p['current_season']=None and the existing line-170 filter `[p for p in items if p.get('current_season')]` will exclude them. Reproduction: curl '<URL>/api/players?season=2023' — observe items where current_season.season == 2024."
+}

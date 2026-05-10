@@ -20,25 +20,26 @@ export function formatApiErrorDetail(detail) {
   return String(detail);
 }
 
+// DARK theme position colors — saturated on dark surface
 export const POSITION_STYLES = {
-  QB: "bg-red-50 text-red-700 border-red-200",
-  RB: "bg-blue-50 text-blue-700 border-blue-200",
-  WR: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  TE: "bg-amber-50 text-amber-700 border-amber-200",
-  K: "bg-pink-50 text-pink-700 border-pink-200",
-  DEF: "bg-slate-100 text-slate-700 border-slate-300",
+  QB: "bg-red-500/15 text-red-300 border-red-500/40",
+  RB: "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  WR: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  TE: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+  K:  "bg-pink-500/15 text-pink-300 border-pink-500/40",
+  DEF:"bg-slate-500/15 text-slate-300 border-slate-500/40",
 };
 
 export const TAG_STYLES = {
-  elite: "bg-black text-white border-black",
-  breakout: "bg-emerald-600 text-white border-emerald-600",
-  sleeper: "bg-blue-600 text-white border-blue-600",
-  risk: "bg-red-600 text-white border-red-600",
+  elite:    "bg-emerald-500 text-slate-950 border-emerald-500",
+  breakout: "bg-emerald-500/20 text-emerald-300 border-emerald-500/50",
+  sleeper:  "bg-blue-500/20 text-blue-300 border-blue-500/50",
+  risk:     "bg-red-500/20 text-red-300 border-red-500/50",
 };
 
 export const TAG_LABELS = {
-  elite: "ELITE",
+  elite:    "ELITE",
   breakout: "BREAKOUT",
-  sleeper: "SLEEPER",
-  risk: "BUST RISK",
+  sleeper:  "SLEEPER",
+  risk:     "BUST RISK",
 };

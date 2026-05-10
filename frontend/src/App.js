@@ -4,11 +4,12 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import Home from "./pages/Home";
 import Stats from "./pages/Stats";
-import PlayerProfile from "./pages/PlayerProfile";
 import SleepersBusts from "./pages/SleepersBusts";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MyRankings from "./pages/MyRankings";
+import Lineup from "./pages/Lineup";
+import StartSit from "./pages/StartSit";
 
 function App() {
   return (
@@ -18,13 +19,14 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/stats" element={<Stats />} />
-            <Route path="/player/:id" element={<PlayerProfile />} />
+            <Route path="/lineup" element={<Lineup />} />
+            <Route path="/start-sit" element={<StartSit />} />
             <Route path="/sleepers-busts" element={<SleepersBusts />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/my-rankings" element={<MyRankings />} />
           </Routes>
-          <Toaster position="top-right" />
+          <Toaster position="top-right" theme="dark" />
         </BrowserRouter>
       </AuthProvider>
     </div>
