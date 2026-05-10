@@ -28,10 +28,14 @@ const SLOTS = [
 ];
 
 export default function Lineup() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [scoring, setScoring] = useState("half_ppr");
   const [data, setData] = useState(null);
-  const [activeSlot, setActiveSlot] = useState(null); // { key, idx, label }
-  const [overrides, setOverrides] = useState({}); // slotLabel -> playerObject
+  const [activeSlot, setActiveSlot] = useState(null);
+  const [overrides, setOverrides] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [savedTitle, setSavedTitle] = useState("");
 
   useEffect(() => {
     api.get("/lineup/suggest", { params: { scoring } }).then((r) => setData(r.data));
@@ -49,6 +53,36 @@ export default function Lineup() {
   const swapTo = (slot, player) => {
     setOverrides({ ...overrides, [slot.label]: player });
     setActiveSlot(null);
+  };
+
+  const handleSave = async () => {
+    if (!user || user === false) {
+      toast.error("Sign in to save lineups");
+      navigate("/login");
+      return;
+    }
+    if (!savedTitle.trim()) {
+      toast.error("Add a title for this lineup");
+      return;
+    }
+    setSaving(true);
+    const starters_payload = SLOTS.map((s) => {
+      const p = getStarter(s);
+      return p ? { slot: s.label, player_id: p.id } : null;
+    }).filter(Boolean);
+    const benchIds = [];
+    Object.values(data?.bench_alternatives || {}).forEach((arr) =>
+      arr.slice(0, 3).forEach((p) => benchIds.push(p.id))
+    );
+    try {
+      await api.post("/lineups", { title: savedTitle, scoring, starters: starters_payload, bench: benchIds });
+      toast.success("Lineup saved!");
+      setSavedTitle("");
+    } catch (e) {
+      toast.error("Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -76,6 +110,27 @@ export default function Lineup() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Save row */}
+        <div className="bg-slate-950/40 border border-slate-800 rounded-md p-4 flex flex-wrap items-center gap-3" data-testid="lineup-save-bar">
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <Save className="w-4 h-4 text-emerald-400" />
+            {user && user !== false
+              ? "Save this lineup so the Lab can score predictions and learn over time."
+              : "Sign in to save lineups so the Lab can track predictions over time."}
+          </div>
+          <Input
+            value={savedTitle}
+            onChange={(e) => setSavedTitle(e.target.value)}
+            placeholder="Lineup title (e.g. Week 1 plan)"
+            className="md:max-w-xs bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
+            data-testid="save-lineup-title"
+          />
+          <Button onClick={handleSave} disabled={saving} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold" data-testid="save-lineup-btn">
+            {saving ? "Saving…" : (user && user !== false ? "Save Lineup" : "Login to Save")}
+          </Button>
+        </div>
+
+        <AdSlot slot="lineup-mid" />
         {/* Starting lineup grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="starters-grid">
           {SLOTS.map((slot) => {
