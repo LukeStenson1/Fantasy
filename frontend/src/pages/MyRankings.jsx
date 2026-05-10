@@ -80,6 +80,40 @@ export default function MyRankings() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {user?.role === "admin" && (
+          <div className="bg-slate-950/60 border border-amber-500/30 rounded-md p-5" data-testid="admin-panel">
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className="w-5 h-5 text-amber-400" />
+              <h2 className="font-display font-bold text-lg text-white">Admin Panel</h2>
+              <span className="ml-auto text-[10px] font-bold tracking-[0.15em] uppercase text-amber-400">admin only</span>
+            </div>
+            <p className="text-sm text-slate-400 mb-3">Re-pull live data from nflverse, then score open predictions so the Lab learns from new outcomes.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={async () => {
+                  toast.info("Refreshing from nflverse…");
+                  try { const { data } = await api.post("/admin/refresh-data?force=true"); toast.success(`Loaded ${data.players} players · seasons ${data.seasons?.join(", ")}`); }
+                  catch { toast.error("Refresh failed"); }
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold" data-testid="admin-refresh-btn">
+                Refresh Data from nflverse
+              </Button>
+              <Button
+                onClick={async () => {
+                  toast.info("Settling predictions…");
+                  try {
+                    const { data } = await api.post("/predictions/settle");
+                    toast.success(`Settled ${data.settled} predictions · self-learning updated`);
+                    const r = await api.get("/predictions/stats"); setPredStats(r.data);
+                  } catch { toast.error("Settle failed"); }
+                }}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold" data-testid="admin-settle-btn">
+                Settle Predictions
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Self-learning stats */}
         <div className="bg-slate-950/60 border border-emerald-500/20 rounded-md p-5" data-testid="predstats-panel">
           <div className="flex items-center gap-2 mb-3">
