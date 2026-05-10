@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import Home from "./pages/Home";
@@ -9,7 +9,6 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MyRankings from "./pages/MyRankings";
 import Lineup from "./pages/Lineup";
-import StartSit from "./pages/StartSit";
 import Rookies from "./pages/Rookies";
 import ThisWeek from "./pages/ThisWeek";
 
@@ -20,12 +19,12 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/stats" element={<Stats />} />
+            <Route path="/this-week" element={<ThisWeek />} />
             <Route path="/lineup" element={<Lineup />} />
-            <Route path="/start-sit" element={<StartSit />} />
+            <Route path="/start-sit" element={<Navigate to="/lineup" replace />} />
             <Route path="/sleepers-busts" element={<SleepersBusts />} />
             <Route path="/rookies" element={<Rookies />} />
-            <Route path="/this-week" element={<ThisWeek />} />
+            <Route path="/stats" element={<Stats />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/my-rankings" element={<MyRankings />} />

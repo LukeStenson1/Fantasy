@@ -191,7 +191,10 @@ async def list_players(
     cursor = db.players.find(q, {"_id": 0, "news": 0})
     items = await cursor.to_list(length=2000)
     items = [_attach_current_season(p, season, scoring) for p in items]
-    items = [p for p in items if p.get("current_season")]
+    # Include rookies / DEF / K (no seasonal stats) ONLY when explicitly searching or filtering for them
+    has_explicit_filter = bool(search) or position in ("DEF", "K") or tag is not None
+    if not has_explicit_filter:
+        items = [p for p in items if p.get("current_season")]
     reverse = direction == "desc"
     def keyfn(p):
         v = p.get(sort)
@@ -419,6 +422,104 @@ async def _learned_bias_by_position() -> dict:
     ]
     rows = await db.predictions.aggregate(pipeline).to_list(length=10)
     return {r["_id"]: r["bias_sum"] / max(r["n"], 1) for r in rows if r["n"] >= 5}
+
+
+# ---------- Lineup Builder (roster-based) ----------
+class RosterIn(BaseModel):
+    player_ids: List[str]
+    scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"
+
+
+@api.post("/lineup/build")
+async def build_lineup_from_roster(payload: RosterIn):
+    """Auto-pick a starting lineup from the user's roster: 1QB / 2RB / 2WR / 1TE / 1FLEX / 1K / 1DEF.
+    Returns starters with Lab Score + reasoning, plus bench players ranked."""
+    if not payload.player_ids:
+        raise HTTPException(400, "Provide at least 1 player_id")
+    cursor = db.players.find({"id": {"$in": payload.player_ids}}, {"_id": 0, "news": 0})
+    items = await cursor.to_list(length=200)
+    items = [_attach_current_season(p, None, payload.scoring) for p in items]
+
+    bias = await _learned_bias_by_position()
+    scored = []
+    for p in items:
+        p["_lab_correction"] = -1 * bias.get(p["position"], 0)
+        score, factors = _player_lineup_score_v2(p, payload.scoring)
+        scored.append({
+            "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
+            "tag": p.get("tag"),
+            "lineup_score": score, "factors": factors,
+            "reasoning": _reasoning_text(p, factors),
+            "current_fpts_per_game": p.get("current_fpts_per_game"),
+            "news_search_url": player_news_search_url(p["name"]),
+        })
+
+    by_pos: dict[str, list] = {}
+    for p in scored:
+        by_pos.setdefault(p["position"], []).append(p)
+    for pos in by_pos:
+        by_pos[pos].sort(key=lambda x: x["lineup_score"], reverse=True)
+
+    qb = (by_pos.get("QB", []) or [])[:1]
+    rb = (by_pos.get("RB", []) or [])[:2]
+    wr = (by_pos.get("WR", []) or [])[:2]
+    te = (by_pos.get("TE", []) or [])[:1]
+    k = (by_pos.get("K", []) or [])[:1]
+    d = (by_pos.get("DEF", []) or [])[:1]
+
+    starter_ids = {p["id"] for p in qb + rb + wr + te + k + d}
+    flex_pool = [p for p in scored if p["position"] in ("RB", "WR", "TE") and p["id"] not in starter_ids]
+    flex_pool.sort(key=lambda x: x["lineup_score"], reverse=True)
+    flex = flex_pool[:1]
+    starter_ids |= {p["id"] for p in flex}
+
+    bench = [p for p in scored if p["id"] not in starter_ids]
+    bench.sort(key=lambda x: x["lineup_score"], reverse=True)
+
+    asyncio.create_task(_log_starter_predictions(qb + rb + wr + te + flex, payload.scoring, "lineup_build"))
+
+    return {
+        "scoring": payload.scoring,
+        "starters": {
+            "QB": qb, "RB": rb, "WR": wr, "TE": te, "FLEX": flex, "K": k, "DEF": d,
+        },
+        "bench": bench,
+    }
+
+
+def _player_lineup_score_v2(p: dict, scoring: str) -> tuple[float, dict]:
+    """Lab Score for ANY position including K and DEF.
+    QB/RB/WR/TE → uses current-season FPts/G + matchup + tag boost + correction.
+    K → matchup-based (soft pass D = more sacks/punts → more FG attempts).
+    DEF → matchup-based (vs weak offense = more points)."""
+    pos = p.get("position")
+    opp = get_next_opponent_team(p.get("team") or "")
+
+    if pos == "DEF":
+        # Estimate opposing offense weakness as inverse of how their offense ranks vs DEFs (use generic position scoring)
+        # Use a rough 'opposing offense' proxy: average of QB/RB/WR/TE def_rank for the opp team flipped
+        ranks = [get_def_rank(opp, x) if opp else 16 for x in ("QB", "RB", "WR", "TE")]
+        avg_rank = sum(ranks) / max(len(ranks), 1)  # 1 = strong def, 32 = soft def
+        # Opposing offense is INVERSE: low avg_rank means they face good defenses (their team is weak offensively)
+        # Soft offense → good DEF play
+        m_score = round((16.5 - avg_rank) / 6, 2)
+        baseline = 7.5  # avg fantasy DEF FPts/G league-wide
+        score = round(baseline + m_score, 2)
+        factors = {"fppg": baseline, "matchup_score": m_score, "def_rank": int(avg_rank), "opponent": opp,
+                   "availability": 0, "tag_boost": 0, "tag": None, "correction": 0}
+        return score, factors
+
+    if pos == "K":
+        # Kickers: matchup against soft def = more FG attempts (game flow / red zone stalls)
+        m_rank = get_def_rank(opp, "QB") if opp else 16  # use QB D-rank as proxy for offensive game flow
+        m_score = round((m_rank - 16.5) / 8, 2)
+        baseline = 8.0  # avg fantasy K FPts/G
+        score = round(baseline + m_score, 2)
+        factors = {"fppg": baseline, "matchup_score": m_score, "def_rank": m_rank, "opponent": opp,
+                   "availability": 0, "tag_boost": 0, "tag": None, "correction": 0}
+        return score, factors
+
+    return _player_lineup_score(p, scoring)
 
 
 async def _log_starter_predictions(starters: list[dict], scoring: str, source: str):

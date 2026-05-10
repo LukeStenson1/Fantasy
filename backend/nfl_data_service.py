@@ -22,10 +22,25 @@ from typing import Iterable
 logger = logging.getLogger("ffref.data")
 
 # Positions we care about for fantasy
-FANTASY_POSITIONS = {"QB", "RB", "WR", "TE"}
+FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
 # Per-position player count caps (top-N by fantasy points in latest season)
-TOP_N = {"QB": 32, "RB": 75, "WR": 75, "TE": 35}
+TOP_N = {"QB": 32, "RB": 75, "WR": 75, "TE": 35, "K": 35}
+
+# 32 NFL team defenses for fantasy lineup support
+NFL_TEAMS = [
+    ("ARI", "Arizona Cardinals"), ("ATL", "Atlanta Falcons"), ("BAL", "Baltimore Ravens"),
+    ("BUF", "Buffalo Bills"), ("CAR", "Carolina Panthers"), ("CHI", "Chicago Bears"),
+    ("CIN", "Cincinnati Bengals"), ("CLE", "Cleveland Browns"), ("DAL", "Dallas Cowboys"),
+    ("DEN", "Denver Broncos"), ("DET", "Detroit Lions"), ("GB", "Green Bay Packers"),
+    ("HOU", "Houston Texans"), ("IND", "Indianapolis Colts"), ("JAX", "Jacksonville Jaguars"),
+    ("KC", "Kansas City Chiefs"), ("LAC", "Los Angeles Chargers"), ("LAR", "Los Angeles Rams"),
+    ("LV", "Las Vegas Raiders"), ("MIA", "Miami Dolphins"), ("MIN", "Minnesota Vikings"),
+    ("NE", "New England Patriots"), ("NO", "New Orleans Saints"), ("NYG", "New York Giants"),
+    ("NYJ", "New York Jets"), ("PHI", "Philadelphia Eagles"), ("PIT", "Pittsburgh Steelers"),
+    ("SEA", "Seattle Seahawks"), ("SF", "San Francisco 49ers"), ("TB", "Tampa Bay Buccaneers"),
+    ("TEN", "Tennessee Titans"), ("WAS", "Washington Commanders"),
+]
 
 
 def _compute_fp(row, scoring: str) -> float:
@@ -377,6 +392,22 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
     await db.players.delete_many({})
     if merged:
         await db.players.insert_many(merged)
+
+    # Seed 32 NFL team defenses (D/ST) — needed for full fantasy lineups
+    def_docs = []
+    for code, full_name in NFL_TEAMS:
+        def_docs.append({
+            "id": str(uuid.uuid4()),
+            "ext_id": f"DEF_{code}",
+            "name": f"{full_name} D/ST",
+            "position": "DEF",
+            "team": code,
+            "age": None, "experience": None, "headshot": "",
+            "tag": None, "rookie_info": None, "seasons": [], "news": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+    await db.players.insert_many(def_docs)
 
     await db.meta.replace_one(
         {"key": "last_refresh"},

@@ -139,14 +139,11 @@ function RookieCard({ rookie, expanded, onToggle, outlook }) {
           )}
         </div>
         <div className="text-right shrink-0">
-          {r.next_opponent && (
+          {r.draft_round && (
             <div className="border border-slate-800 rounded px-2 py-1 bg-slate-950">
-              <div className="text-[9px] font-bold tracking-[0.15em] uppercase text-slate-500">vs {r.position} D</div>
-              <div className={`font-mono-tab font-bold text-base ${
-                (r.matchup_def_rank || 16) >= 24 ? "text-emerald-400" :
-                (r.matchup_def_rank || 16) <= 8 ? "text-red-400" : "text-slate-300"
-              }`}>
-                {r.next_opponent} #{r.matchup_def_rank ?? "?"}
+              <div className="text-[9px] font-bold tracking-[0.15em] uppercase text-slate-500">Draft</div>
+              <div className="font-mono-tab font-bold text-base text-emerald-300">
+                R{r.draft_round} #{r.draft_number}
               </div>
             </div>
           )}
@@ -157,7 +154,7 @@ function RookieCard({ rookie, expanded, onToggle, outlook }) {
         <div className="border-t border-emerald-500/20 bg-slate-950/40 p-4 expand-row">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-4 h-4 text-emerald-400" />
-            <h4 className="font-display font-bold text-white">AI Year-1 Outlook</h4>
+            <h4 className="font-display font-bold text-white">Player + Team Outlook</h4>
             {r.news_search_url && (
               <a href={r.news_search_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                 className="ml-auto text-xs text-emerald-400 hover:underline flex items-center gap-1" data-testid={`rookie-news-link-${r.id}`}>
@@ -165,6 +162,7 @@ function RookieCard({ rookie, expanded, onToggle, outlook }) {
               </a>
             )}
           </div>
+          <p className="text-[11px] text-slate-500 mb-2">Outlook auto-updates as new game data flows into the Lab.</p>
           {!outlook ? (
             <p className="text-sm text-slate-500">Generating outlook…</p>
           ) : (

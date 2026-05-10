@@ -79,12 +79,12 @@ export default function Home() {
         <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-3">◆ The Toolkit</div>
         <h2 className="font-display text-3xl sm:text-4xl font-black tracking-tight text-white mb-12 max-w-2xl">Everything you need to win the week.</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FeatureCard title="Stats Browser" desc="Filter & sort every fantasy-relevant player across multiple seasons. Click any row for the full profile, AI outlook, and team news." icon={<BarChart3 className="w-5 h-5" />} to="/stats" testid="feature-stats" />
           <FeatureCard title="This Week's Edge" desc="Top 10 plays + top 5 fades for the upcoming week. Drop it in your league chat." icon={<Flame className="w-5 h-5" />} to="/this-week" testid="feature-this-week" highlight />
-          <FeatureCard title="Lineup AI" desc="Auto-built starting lineup using composite Lab Score: production, real matchup, availability, and trend." icon={<Wand2 className="w-5 h-5" />} to="/lineup" testid="feature-lineup" />
-          <FeatureCard title="Start / Sit" desc="Add the players on your roster — we tell you exactly who to start this week with full reasoning." icon={<Trophy className="w-5 h-5" />} to="/start-sit" testid="feature-startsit" />
-          <FeatureCard title="Rookie Outlooks" desc="Latest NFL draft class with AI-generated year-1 outlooks: scheme fit, projected role, target share." icon={<TrendingUp className="w-5 h-5" />} to="/rookies" testid="feature-rookies" />
+          <FeatureCard title="Lineup (AI + Start/Sit)" desc="Add your roster — the Lab auto-picks 1QB/2RB/2WR/1TE/1FLEX/1K/1DEF with Lab Score and reasoning." icon={<Wand2 className="w-5 h-5" />} to="/lineup" testid="feature-lineup" />
           <FeatureCard title="Sleepers & Busts" desc="Pre-tagged breakouts, sleepers, elites, and bust risks based on stat trajectories." icon={<Sparkles className="w-5 h-5" />} to="/sleepers-busts" testid="feature-radar" />
+          <FeatureCard title="Rookie Outlooks" desc="Latest NFL draft class with AI-generated player+team trajectory outlooks. Updates as games happen." icon={<TrendingUp className="w-5 h-5" />} to="/rookies" testid="feature-rookies" />
+          <FeatureCard title="Stats Browser" desc="Filter & sort every fantasy-relevant player across multiple seasons. Click any row for full profile." icon={<BarChart3 className="w-5 h-5" />} to="/stats" testid="feature-stats" />
+          <FeatureCard title="My Lab" desc="Saved rankings, saved lineups, and the Lab's self-learning accuracy panel (login required)." icon={<Trophy className="w-5 h-5" />} to="/my-rankings" testid="feature-my-lab" />
         </div>
       </section>
 
