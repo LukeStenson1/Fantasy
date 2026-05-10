@@ -156,12 +156,13 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                 entry["team"] = str(team)
             entry["seasons"].append(_season_record(row, season))
 
-    # Filter to top-N per position based on latest season fpts
+    # Filter to top-N per position based on best-of-any-season fpts (so high-profile
+    # injured stars like CMC who had monster prior seasons still surface).
     per_position: dict[str, list[dict]] = {}
     for entry in all_player_seasons.values():
         pos = entry["position"]
-        latest = max(entry["seasons"], key=lambda s: s["season"])
-        entry["_latest_fpts"] = latest.get("fpts_half_ppr", 0)
+        best = max((s.get("fpts_half_ppr", 0) for s in entry["seasons"]), default=0)
+        entry["_latest_fpts"] = best
         per_position.setdefault(pos, []).append(entry)
 
     selected: list[dict] = []
@@ -229,9 +230,9 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
 async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bool = False) -> dict:
     """Refresh player data from nfl-data-py. Returns summary."""
     if seasons is None:
-        # Try most recent 4 seasons; missing ones are skipped
+        # Try recent seasons; missing ones (current/upcoming not yet published by nflverse) are skipped.
         current_year = datetime.now(timezone.utc).year
-        seasons = list(range(current_year - 3, current_year + 1))
+        seasons = list(range(current_year - 4, current_year + 1))
 
     # Skip if data fresh
     if not force:

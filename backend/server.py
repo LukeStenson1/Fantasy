@@ -132,9 +132,10 @@ async def refresh_token_ep(request: Request, response: Response):
 def _attach_current_season(p: dict, season: Optional[int], scoring: str):
     seasons = p.get("seasons", [])
     cur = None
-    if season:
+    if season is not None:
+        # Strict: only return the row for that season; if absent, leave None so caller filters out
         cur = next((s for s in seasons if s.get("season") == season), None)
-    if cur is None and seasons:
+    elif seasons:
         cur = max(seasons, key=lambda s: s.get("season", 0))
     p["current_season"] = cur
     if cur:
