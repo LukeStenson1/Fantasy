@@ -31,6 +31,8 @@
 - ✅ CSV upload for custom data import (`POST /api/upload/csv`) — accepts any season, useful when you want to upload partial 2025 stats early.
 - ✅ Ad-slot containers (`<AdSlot slot="..." />`) on Home / Lineup / This Week / My Lab, ready for AdSense or Carbon ad activation.
 - ✅ DARK theme, FantasyLab branding, FL logo.
+- ✅ ESPN real-time injuries — refreshed via `POST /api/admin/refresh-injuries`, badges on Stats table + factored into Lab Score.
+- ✅ **Defense vs Position (DvP) overlay (2026-02)** — live computed from `nfl-data-py` weekly data (latest season w/ ≥4 weeks). Each defense ranked 1–32 per position with FPts allowed/G. Color-coded matchup badges (🟢 EASY/GOOD, 🟦 NEUTRAL, 🔴 HARD/TOUGH) on Lineup slot cards, bench, and StatsTable expanded profile. Reasoning includes "X.X allowed/G". Persisted in `db.meta`, hydrated on startup, falls back to static 2024 baseline if not yet computed.
 
 ## Test Credentials
 - Admin: `admin@ffref.com` / `admin123`
@@ -45,9 +47,10 @@
 
 ## Prioritized Backlog
 - **P1**: When admin runs `POST /api/predictions/settle` after 2025 stats land, the Lab will correct its own bias automatically. Document this admin flow.
-- **P2**: Real defense-vs-position rankings computed from play-by-play instead of synthesized 2024 dict.
+- **P1**: Sleeper league import (one-click roster sync into Lineup tool via Sleeper username).
 - **P2**: AdSense / Carbon ad integration (slot containers ready in code).
-- **P2**: Sleeper league import (one-click roster sync into Start/Sit).
+- **P2**: Yahoo / ESPN league import (OAuth — more complex than Sleeper).
+- **P2**: Refactor `server.py` (~1000+ lines) into modular FastAPI routers (`/routes/players.py`, `/routes/lineups.py`, `/routes/admin.py`).
 - **P3**: Mock-draft simulator using sleeper/bust tags.
 - **P3**: Trade analyzer.
 

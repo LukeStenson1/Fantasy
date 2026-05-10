@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { PositionBadge, TagBadge, InjuryBadge } from "../components/Badges";
+import { PositionBadge, TagBadge, InjuryBadge, MatchupBadge } from "../components/Badges";
 import { Plus, X, Trophy, Sparkles, Save, ExternalLink, Wand2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -207,10 +207,18 @@ export default function Lineup() {
                         <span className="text-slate-600 font-mono-tab text-xs w-5">{i + 1}</span>
                         <PositionBadge position={p.position} />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-white">{p.name}</span>
                             <span className="text-xs text-slate-500 font-mono-tab">{p.team}</span>
                             <TagBadge tag={p.tag} />
+                            <MatchupBadge
+                              rank={p.factors?.def_rank}
+                              opp={p.factors?.opponent}
+                              position={p.position}
+                              fptsAllowed={p.factors?.def_fpts_allowed}
+                              source={p.factors?.def_rank_source}
+                              compact
+                            />
                           </div>
                           <div className="text-xs text-slate-400 truncate">{p.reasoning}</div>
                         </div>
@@ -259,6 +267,7 @@ export default function Lineup() {
 
 function SlotCard({ slotLabel, player }) {
   const p = player;
+  const f = p.factors || {};
   return (
     <div className="bg-slate-950/60 border border-slate-800 hover:border-emerald-500/50 rounded-md p-4 transition-colors" data-testid={`slot-${slotLabel}`}>
       <div className="flex items-center justify-between mb-3">
@@ -268,10 +277,17 @@ function SlotCard({ slotLabel, player }) {
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <PositionBadge position={p.position} />
         <TagBadge tag={p.tag} />
-        <InjuryBadge status={p.factors?.injury_status} />
+        <InjuryBadge status={f.injury_status} />
+        <MatchupBadge
+          rank={f.def_rank}
+          opp={f.opponent}
+          position={p.position}
+          fptsAllowed={f.def_fpts_allowed}
+          source={f.def_rank_source}
+        />
       </div>
       <div className="font-display font-bold text-lg text-white leading-tight">{p.name}</div>
-      <div className="text-xs font-mono-tab text-slate-400">{p.team}</div>
+      <div className="text-xs font-mono-tab text-slate-400">{p.team}{f.opponent ? ` · vs ${f.opponent}` : ""}</div>
       <div className="mt-3 pt-3 border-t border-slate-800">
         <div className="flex items-baseline justify-between">
           <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">Lab Score</div>

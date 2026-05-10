@@ -29,7 +29,8 @@ from llm_service import generate_player_outlook
 from nfl_data_service import (
     refresh_player_data, get_def_rank, matchup_score,
     DEF_VS_POS_2024, get_next_opponent, get_next_opponent_team,
-    player_news_search_url,
+    player_news_search_url, get_def_dvp, get_dvp_table,
+    hydrate_dvp_cache, hydrate_next_opp_cache,
 )
 from espn_injuries import refresh_injuries, injury_penalty
 
@@ -218,7 +219,10 @@ async def get_player(player_id: str, scoring: Literal["standard", "half_ppr", "p
         p["next_opponent"] = info["opponent"]
         p["next_opponent_home"] = info.get("home")
         p["next_opponent_week"] = info.get("week")
-        p["matchup_def_rank"] = get_def_rank(info["opponent"], p["position"])
+        dvp = get_def_dvp(info["opponent"], p["position"])
+        p["matchup_def_rank"] = dvp.get("rank", 16)
+        p["matchup_def_fpts_allowed"] = dvp.get("fpts_allowed_per_game")
+        p["matchup_def_source"] = dvp.get("source")
         p["matchup_score"] = matchup_score(info["opponent"], p["position"])
     p["news_search_url"] = player_news_search_url(p["name"])
     return p
@@ -298,7 +302,7 @@ def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
     # Matchup from live schedule
     opp = get_next_opponent_team(p.get("team") or "")
     m_score = matchup_score(opp, p["position"]) if opp else 0
-    def_rank = get_def_rank(opp, p["position"]) if opp else 16
+    dvp = get_def_dvp(opp, p["position"]) if opp else {"rank": 16, "fpts_allowed_per_game": None, "source": "none"}
 
     # Availability factor: penalize low games (injury)
     avail = 0.0
@@ -315,7 +319,9 @@ def _player_lineup_score(p: dict, scoring: str) -> tuple[float, dict]:
     factors = {
         "fppg": fppg,
         "matchup_score": m_score,
-        "def_rank": def_rank,
+        "def_rank": dvp.get("rank", 16),
+        "def_fpts_allowed": dvp.get("fpts_allowed_per_game"),
+        "def_rank_source": dvp.get("source"),
         "opponent": opp,
         "availability": avail,
         "tag_boost": tag_boost,
@@ -330,13 +336,17 @@ def _reasoning_text(p: dict, factors: dict) -> str:
     parts.append(f"{fppg:.1f} FPts/G last season")
     opp = factors["opponent"]
     rank = factors["def_rank"]
+    fpa = factors.get("def_fpts_allowed")
     if opp:
-        if rank >= 24:
-            parts.append(f"soft matchup vs {opp} (#{rank} D vs {p['position']})")
-        elif rank <= 8:
-            parts.append(f"tough matchup vs {opp} (#{rank} D vs {p['position']})")
+        rank_label = (
+            "soft matchup" if rank >= 24 else
+            "tough matchup" if rank <= 8 else
+            "neutral matchup"
+        )
+        if fpa:
+            parts.append(f"{rank_label} vs {opp} (#{rank} D vs {p['position']}, {fpa:.1f} allowed/G)")
         else:
-            parts.append(f"neutral matchup vs {opp} (#{rank} D vs {p['position']})")
+            parts.append(f"{rank_label} vs {opp} (#{rank} D vs {p['position']})")
     if factors.get("injury_status"):
         parts.append(f"injury: {factors['injury_status']}")
     if factors["availability"] < 0:
@@ -808,7 +818,9 @@ def _draft_round(dn: Optional[int]) -> Optional[int]:
 # ---------- Defense rankings ----------
 @api.get("/defense-rankings")
 async def defense_rankings():
-    return DEF_VS_POS_2024
+    """Returns live computed DvP if available, else static fallback.
+    Shape: {source, data: {position: {team: {rank, fpts_allowed_per_game, games, season}}}}"""
+    return get_dvp_table()
 
 
 # ---------- Teams ----------
@@ -1006,6 +1018,16 @@ async def startup():
             "password_hash": hash_password("user123"),
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
+
+    # Hydrate persisted DvP + next-opp caches before any request hits us
+    dvp_meta = await db.meta.find_one({"key": "dvp_live"}, {"_id": 0})
+    if dvp_meta and dvp_meta.get("value"):
+        hydrate_dvp_cache(dvp_meta["value"])
+        logger.info(f"Hydrated DvP cache: {sum(len(v) for v in dvp_meta['value'].values())} cells")
+    no_meta = await db.meta.find_one({"key": "next_opp"}, {"_id": 0})
+    if no_meta and no_meta.get("value"):
+        hydrate_next_opp_cache(no_meta["value"])
+        logger.info(f"Hydrated next-opp cache: {len(no_meta['value'])} teams")
 
     # Refresh real data in background — don't block startup
     async def _bg_refresh():

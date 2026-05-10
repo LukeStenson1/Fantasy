@@ -301,6 +301,94 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
     return seasonal_dfs, roster_dfs
 
 
+def _fetch_weekly_sync(seasons: Iterable[int]):
+    """Pull weekly data for DvP computation. Returns concatenated DataFrame or None."""
+    import nfl_data_py as nfl
+    import pandas as pd
+    frames = []
+    for s in seasons:
+        try:
+            df = nfl.import_weekly_data([s])
+            if df is not None and not df.empty:
+                df["_season"] = s
+                frames.append(df)
+                logger.info(f"Pulled {s} weekly data: {len(df)} rows")
+        except Exception as e:
+            logger.warning(f"Season {s} weekly data not available: {e}")
+    if not frames:
+        return None
+    return pd.concat(frames, ignore_index=True)
+
+
+def _compute_dvp_from_weekly(weekly_df) -> dict:
+    """Compute Defense vs Position from weekly stats.
+    Returns: { position: { team: {rank, fpts_allowed_per_game, games, season} } }
+    Methodology: For each (opponent_team, position) over the latest available season(s),
+    sum fantasy_points_half_ppr scored against them, divide by distinct (week,season) game count.
+    Lower rank (1) = toughest D (least points allowed). Higher rank (32) = softest D."""
+    import pandas as pd
+    if weekly_df is None or weekly_df.empty:
+        return {}
+
+    # Determine latest season with meaningful weekly data (>=4 weeks recorded)
+    seasons_avail = sorted(weekly_df["_season"].dropna().unique().tolist())
+    if not seasons_avail:
+        return {}
+    target_season = None
+    for s in reversed(seasons_avail):
+        wk_count = weekly_df[weekly_df["_season"] == s]["week"].nunique()
+        if wk_count >= 4:
+            target_season = int(s)
+            break
+    if target_season is None:
+        target_season = int(seasons_avail[-1])
+
+    df = weekly_df[weekly_df["_season"] == target_season].copy()
+    # Required columns
+    needed = {"position", "opponent_team", "week", "fantasy_points"}
+    if not needed.issubset(set(df.columns)):
+        logger.warning(f"Weekly data missing columns. Have: {list(df.columns)[:20]}")
+        return {}
+
+    df = df[df["position"].isin(["QB", "RB", "WR", "TE"])]
+    df = df[df["opponent_team"].notna()]
+    # Use half-PPR equivalent if column present, else fantasy_points (standard); fall back to PPR.
+    if "fantasy_points_ppr" in df.columns:
+        # half-PPR ≈ avg(standard, ppr)
+        df["_fp_half"] = (df["fantasy_points"].fillna(0) + df["fantasy_points_ppr"].fillna(0)) / 2.0
+    else:
+        df["_fp_half"] = df["fantasy_points"].fillna(0)
+
+    # Aggregate: sum fp per opponent_team x position x (season,week) -> game-level points allowed
+    game_level = (
+        df.groupby(["opponent_team", "position", "week"], as_index=False)["_fp_half"].sum()
+    )
+    # Per defense per position: average across weeks
+    per_def = (
+        game_level.groupby(["opponent_team", "position"], as_index=False)
+                 .agg(fpts_allowed_per_game=("_fp_half", "mean"),
+                      games=("_fp_half", "count"))
+    )
+
+    out: dict[str, dict] = {}
+    for pos in ["QB", "RB", "WR", "TE"]:
+        sub = per_def[per_def["position"] == pos].copy()
+        if sub.empty:
+            continue
+        # Rank: 1 = toughest (lowest points allowed), 32 = softest (most points allowed)
+        sub = sub.sort_values("fpts_allowed_per_game", ascending=True).reset_index(drop=True)
+        out[pos] = {}
+        for i, row in sub.iterrows():
+            out[pos][str(row["opponent_team"])] = {
+                "rank": int(i + 1),
+                "fpts_allowed_per_game": round(float(row["fpts_allowed_per_game"]), 2),
+                "games": int(row["games"]),
+                "season": target_season,
+            }
+    logger.info(f"DvP computed from {target_season} weekly data: {sum(len(v) for v in out.values())} (team,pos) cells")
+    return out
+
+
 def _fetch_schedule_sync(seasons: Iterable[int]):
     """Pull real NFL schedule for given seasons. Returns dict team -> next opponent."""
     import nfl_data_py as nfl
@@ -337,6 +425,24 @@ def _fetch_schedule_sync(seasons: Iterable[int]):
 # Cache: refreshed each refresh_player_data() call
 _NEXT_OPP_CACHE: dict[str, dict] = {}
 
+# Live DvP cache populated from nfl-data-py weekly data each refresh.
+# Shape: { position: { team: {rank, fpts_allowed_per_game, games, season} } }
+_DVP_LIVE: dict[str, dict] = {}
+
+
+def hydrate_dvp_cache(dvp: dict) -> None:
+    """Load a previously-persisted DvP map into the module cache (called from server startup)."""
+    global _DVP_LIVE
+    if isinstance(dvp, dict) and dvp:
+        _DVP_LIVE = dvp
+
+
+def hydrate_next_opp_cache(no: dict) -> None:
+    """Load a previously-persisted next-opponent map into the module cache."""
+    global _NEXT_OPP_CACHE
+    if isinstance(no, dict) and no:
+        _NEXT_OPP_CACHE = no
+
 
 async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bool = False) -> dict:
     """Refresh player data from nfl-data-py. Returns summary."""
@@ -367,6 +473,14 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
     if next_opp:
         _NEXT_OPP_CACHE = next_opp
         logger.info(f"Live schedule loaded: {len(next_opp)} teams have next-opponent data")
+
+    # Compute live DvP from weekly data (latest season with >=4 weeks)
+    dvp_seasons = available or available_rosters
+    weekly_df = await loop.run_in_executor(None, _fetch_weekly_sync, dvp_seasons)
+    dvp_live = await loop.run_in_executor(None, _compute_dvp_from_weekly, weekly_df)
+    global _DVP_LIVE
+    if dvp_live:
+        _DVP_LIVE = dvp_live
 
     if not available and not available_rosters:
         return {"status": "error", "reason": "no_data"}
@@ -414,7 +528,20 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
         {"key": "last_refresh", "value": datetime.now(timezone.utc).isoformat(), "seasons": available, "count": len(merged)},
         upsert=True,
     )
-    return {"status": "ok", "players": len(merged), "seasons": available}
+    # Persist computed DvP + next-opp so they survive restarts
+    if dvp_live:
+        await db.meta.replace_one(
+            {"key": "dvp_live"},
+            {"key": "dvp_live", "value": dvp_live, "updated_at": datetime.now(timezone.utc).isoformat()},
+            upsert=True,
+        )
+    if next_opp:
+        await db.meta.replace_one(
+            {"key": "next_opp"},
+            {"key": "next_opp", "value": next_opp, "updated_at": datetime.now(timezone.utc).isoformat()},
+            upsert=True,
+        )
+    return {"status": "ok", "players": len(merged), "seasons": available, "dvp_cells": sum(len(v) for v in (dvp_live or {}).values())}
 
 
 # Defense vs position rankings — synthesized 2024 (1=best D / hardest matchup, 32=worst D / softest matchup)
@@ -466,8 +593,33 @@ def player_news_search_url(player_name: str) -> str:
 
 
 def get_def_rank(opp_team: str, position: str) -> int:
-    """Return defense rank (1=tough, 32=soft) for opp_team vs position."""
+    """Return defense rank (1=tough, 32=soft) for opp_team vs position.
+    Prefers live computed DvP from nfl-data-py weekly data; falls back to static 2024 map."""
+    live = _DVP_LIVE.get(position, {}).get(opp_team)
+    if live and "rank" in live:
+        return int(live["rank"])
     return DEF_VS_POS_2024.get(position, {}).get(opp_team, 16)
+
+
+def get_def_dvp(opp_team: str, position: str) -> dict:
+    """Return full DvP cell: {rank, fpts_allowed_per_game, games, season, source}.
+    Source is "live" when computed from weekly data, "static" when fallback."""
+    live = _DVP_LIVE.get(position, {}).get(opp_team)
+    if live and "rank" in live:
+        return {**live, "source": "live"}
+    rank = DEF_VS_POS_2024.get(position, {}).get(opp_team, 16)
+    return {"rank": rank, "fpts_allowed_per_game": None, "games": None, "season": 2024, "source": "static"}
+
+
+def get_dvp_table() -> dict:
+    """Return entire DvP map currently in cache (for /api/defense-rankings)."""
+    if _DVP_LIVE:
+        return {"source": "live", "data": _DVP_LIVE}
+    # Wrap static into similar shape
+    static_wrapped = {pos: {team: {"rank": rank, "fpts_allowed_per_game": None, "games": None, "season": 2024}
+                            for team, rank in teams.items()}
+                      for pos, teams in DEF_VS_POS_2024.items()}
+    return {"source": "static", "data": static_wrapped}
 
 
 def matchup_score(opp_team: str, position: str) -> float:

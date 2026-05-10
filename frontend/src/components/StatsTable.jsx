@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, ExternalLink, RefreshCcw, Sparkles, Newspaper } from "lucide-react";
-import { PositionBadge, TagBadge, InjuryBadge } from "./Badges";
+import { PositionBadge, TagBadge, InjuryBadge, MatchupBadge } from "./Badges";
 import { api } from "../lib/api";
 import { Button } from "./ui/button";
 
@@ -172,11 +172,21 @@ function ExpandedContent({ player, scoring }) {
           <Stat label="Yrs" value={full.experience ?? "—"} />
           {full.next_opponent && <Stat label="Next Opp" value={full.next_opponent} />}
           {full.matchup_def_rank && (
-            <Stat
-              label={`vs ${full.position} D`}
-              value={`#${full.matchup_def_rank}`}
-              accent={full.matchup_def_rank >= 24 ? "text-emerald-400" : full.matchup_def_rank <= 8 ? "text-red-400" : "text-slate-300"}
-            />
+            <div className="border border-slate-800 rounded-md px-3 py-2 bg-slate-950/40">
+              <div className="text-[9px] font-bold tracking-[0.2em] uppercase text-slate-500">vs {full.position} D</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <MatchupBadge
+                  rank={full.matchup_def_rank}
+                  opp={full.next_opponent}
+                  position={full.position}
+                  fptsAllowed={full.matchup_def_fpts_allowed}
+                  source={full.matchup_def_source}
+                />
+                {full.matchup_def_fpts_allowed && (
+                  <span className="text-[10px] font-mono-tab text-slate-400">{full.matchup_def_fpts_allowed.toFixed(1)} allowed/G</span>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>

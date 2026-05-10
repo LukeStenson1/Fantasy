@@ -49,3 +49,72 @@ export function InjuryBadge({ status, short }) {
     </span>
   );
 }
+
+const MATCHUP_STYLES = {
+  easy: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  good: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  neutral: "bg-slate-700/30 text-slate-300 border-slate-600/50",
+  hard: "bg-red-500/10 text-red-300 border-red-500/30",
+  brutal: "bg-red-500/20 text-red-300 border-red-500/50",
+};
+
+const MATCHUP_DOT = {
+  easy: "bg-emerald-400",
+  good: "bg-emerald-500",
+  neutral: "bg-slate-500",
+  hard: "bg-red-500",
+  brutal: "bg-red-400",
+};
+
+export function bucketForRank(rank) {
+  if (!rank) return null;
+  if (rank >= 27) return "easy";
+  if (rank >= 20) return "good";
+  if (rank >= 13) return "neutral";
+  if (rank >= 6) return "hard";
+  return "brutal";
+}
+
+const MATCHUP_LABEL = {
+  easy: "EASY",
+  good: "GOOD",
+  neutral: "NEUTRAL",
+  hard: "HARD",
+  brutal: "TOUGH",
+};
+
+export function MatchupBadge({ rank, opp, position, fptsAllowed, source, compact }) {
+  if (!rank) return null;
+  const b = bucketForRank(rank);
+  const cls = MATCHUP_STYLES[b];
+  const dot = MATCHUP_DOT[b];
+  const label = MATCHUP_LABEL[b];
+  const tipParts = [];
+  if (opp) tipParts.push(`vs ${opp}`);
+  if (position) tipParts.push(`#${rank} D vs ${position}`);
+  if (fptsAllowed) tipParts.push(`${fptsAllowed.toFixed(1)} FPts allowed/G`);
+  if (source === "static") tipParts.push("(2024 baseline — refresh data for live)");
+  const title = tipParts.join(" · ");
+  if (compact) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${cls}`}
+        title={title}
+        data-testid={`matchup-badge-${b}`}
+      >
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`}></span>
+        #{rank}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold tracking-wider ${cls}`}
+      title={title}
+      data-testid={`matchup-badge-${b}`}
+    >
+      <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`}></span>
+      {label} #{rank}
+    </span>
+  );
+}
