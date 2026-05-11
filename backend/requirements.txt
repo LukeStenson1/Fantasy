@@ -28,6 +28,5 @@ appdirs==1.4.4
 cramjam==2.11.0
 fastparquet==2026.3.0
 numpy==1.26.4
-pandas==1.5.3
 pytz==2026.2
 nfl-data-py==0.3.3
