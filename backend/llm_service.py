@@ -1,7 +1,7 @@
-"""LLM service for player outlook generation using Claude Sonnet 4.5 via Emergent LLM key."""
+"""LLM service for player outlook generation using Claude via Anthropic API."""
 import os
 import uuid
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from anthropic import AsyncAnthropic
 
 
 SYSTEM_MSG = (
@@ -19,6 +19,20 @@ ROOKIE_SYSTEM_MSG = (
     "deploy them, 2) Year-1 fantasy expectation (target/touch share, snap %), 3) Multi-year ceiling. As real-season "
     "games happen, this outlook should update naturally because new stats feed back into the dataset. "
     "Format as 3 short sections: Player + Team Fit, Year-1 Expectation, Long-Term Ceiling. Plain text, no markdown."
+)
+
+TRADE_SYSTEM_MSG = (
+    "You are an expert fantasy football trade analyst. Given two sides of a proposed trade with each "
+    "player's live Lab Score, current team, next opponent + matchup difficulty (DvP rank), live injury "
+    "status, and tag (elite/breakout/sleeper/risk), produce a concise, opinionated verdict. Always factor "
+    "in injury status — if a player is OUT/IR, they have no near-term value. Always factor matchup "
+    "difficulty for the upcoming week. Format: VERDICT (one line, who wins and by how much), "
+    "WHY (3-5 bullets covering injury, matchup, value tier, age/role), RECOMMENDATION (1-2 sentences). "
+    "Plain text. No markdown. Be direct and useful, not generic."
+)
+
+client = AsyncAnthropic(
+    api_key=os.environ.get("EMERGENT_LLM_KEY")
 )
 
 
@@ -46,6 +60,7 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         news_summary = "\n".join(
             f"- ({n.get('date','')}) {n.get('headline','')}: {n.get('snippet','')}" for n in news_items[:6]
         ) or "No recent news on record."
+
         inj_status = player.get("injury_status")
         inj_short = player.get("injury_short")
         inj_line = ""
@@ -54,10 +69,11 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
             if inj_short:
                 inj_line += f" — {inj_short[:200]}"
             inj_line += "\n"
+
         prompt = (
             f"PLAYER: {player.get('name')} | {player.get('position')} | {player.get('team')}\n"
             f"AGE: {player.get('age', 'N/A')} | EXPERIENCE: {player.get('experience','N/A')} yrs\n"
-            f"SCORING: {scoring.replace('_',' ').upper()}\n"
+            f"SCORING: {scoring.replace('_', ' ').upper()}\n"
             f"{inj_line}"
             f"LAST SEASON ({last_season.get('season','')}): "
             f"GP {last_season.get('games',0)}, FPTS/G {last_season.get('fpts_per_game_half_ppr',0)}, "
@@ -67,28 +83,19 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         )
         sys_msg = SYSTEM_MSG
 
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=f"outlook-{player.get('id', uuid.uuid4())}",
-        system_message=sys_msg,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-
     try:
-        resp = await chat.send_message(UserMessage(text=prompt))
-        return str(resp).strip()
+        resp = await client.messages.create(
+            model="claude-3-5-sonnet-latest",
+            max_tokens=800,
+            system=sys_msg,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return resp.content[0].text.strip()
+
     except Exception as e:
         return f"AI outlook unavailable: {e}"
-
-
-TRADE_SYSTEM_MSG = (
-    "You are an expert fantasy football trade analyst. Given two sides of a proposed trade with each "
-    "player's live Lab Score, current team, next opponent + matchup difficulty (DvP rank), live injury "
-    "status, and tag (elite/breakout/sleeper/risk), produce a concise, opinionated verdict. Always factor "
-    "in injury status — if a player is OUT/IR, they have no near-term value. Always factor matchup "
-    "difficulty for the upcoming week. Format: VERDICT (one line, who wins and by how much), "
-    "WHY (3-5 bullets covering injury, matchup, value tier, age/role), RECOMMENDATION (1-2 sentences). "
-    "Plain text. No markdown. Be direct and useful, not generic."
-)
 
 
 def _format_trade_side(label: str, side: dict) -> str:
@@ -102,6 +109,7 @@ def _format_trade_side(label: str, side: dict) -> str:
         tag = p.get("tag") or "—"
         fppg = p.get("current_fpts_per_game") or 0
         fpa_str = f", {fpa:.1f} allowed/G" if fpa else ""
+
         lines.append(
             f"  - {p['name']} ({p['position']}, {p['team']}) | LabScore {p['lineup_score']:.1f} | "
             f"{fppg:.1f} FPts/G last yr | next: vs {opp} (D rank #{rank}{fpa_str}) | "
@@ -124,14 +132,16 @@ async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a
         "Produce the trade verdict as instructed."
     )
 
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=f"trade-{uuid.uuid4()}",
-        system_message=TRADE_SYSTEM_MSG,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-
     try:
-        resp = await chat.send_message(UserMessage(text=prompt))
-        return str(resp).strip()
+        resp = await client.messages.create(
+            model="claude-3-5-sonnet-latest",
+            max_tokens=900,
+            system=TRADE_SYSTEM_MSG,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return resp.content[0].text.strip()
+
     except Exception as e:
         return f"AI verdict unavailable: {e}"
