@@ -1194,8 +1194,15 @@ async def shutdown():
 app.include_router(api)
 
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-allowed = [frontend_url, "http://localhost:3000"]
+allowed = [
+    "https://fantasy-px0g20.pages.dev",  # your deployed frontend
+    "http://localhost:3000",             # local dev
+]
+
 app.add_middleware(
-    CORSMiddleware, allow_origins=allowed, allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=allowed,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
