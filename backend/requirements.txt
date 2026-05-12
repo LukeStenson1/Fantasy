@@ -30,3 +30,4 @@ fastparquet==2026.3.0
 numpy==1.26.4
 pytz==2026.2
 nfl-data-py==0.3.3
+setuptools>=68.0.0
