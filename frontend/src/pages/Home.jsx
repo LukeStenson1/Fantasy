@@ -1,46 +1,79 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
-import { ArrowRight, ArrowRightLeft, Activity, BarChart3, Database, Flame, Sparkles, TrendingUp, Trophy, Wand2 } from "lucide-react";
-import { PositionBadge, TagBadge, MatchupBadge } from "../components/Badges";
 import AdSlot from "../components/AdSlot";
+import { PositionBadge } from "../components/Badges";
+
+/* ---------------- SAFE NORMALIZER ---------------- */
+const safeArray = (v) =>
+  Array.isArray(v) ? v : v?.items || v?.data || [];
+
+const safeObject = (v, fallback = {}) =>
+  v && typeof v === "object" ? v : fallback;
 
 export default function Home() {
-  const [summary, setSummary] = useState({ total_players: 0, data_seasons: [], last_refresh: null });
-  const [movers, setMovers] = useState({ sleepers: [], busts: [], breakouts: [], elites: [] });
+  const [summary, setSummary] = useState({
+    total_players: 0,
+    data_seasons: [],
+    last_refresh: null,
+  });
+
+  const [movers, setMovers] = useState({
+    sleepers: [],
+    busts: [],
+    breakouts: [],
+    elites: [],
+  });
+
   const [matchups, setMatchups] = useState(null);
 
   useEffect(() => {
-    api.get("/stats/summary").then((r) => setSummary(r.data)).catch(() => {});
-    api.get("/sleepers-busts", { params: { scoring: "half_ppr" } }).then((r) => setMovers(r.data)).catch(() => {});
-    api.get("/matchups/this-week").then((r) => setMatchups(r.data)).catch(() => {});
+    // SUMMARY
+    api.get("/stats/summary")
+      .then((r) => setSummary(safeObject(r.data)))
+      .catch((err) => console.error("summary error", err));
+
+    // MOVERS
+    api.get("/sleepers-busts", { params: { scoring: "half_ppr" } })
+      .then((r) => setMovers(safeObject(r.data)))
+      .catch((err) => console.error("movers error", err));
+
+    // MATCHUPS
+    api.get("/matchups/this-week")
+      .then((r) => setMatchups(safeObject(r.data)))
+      .catch((err) => console.error("matchups error", err));
   }, []);
+
+  const byPos =
+    matchups?.by_position ||
+    matchups?.byPosition ||
+    matchups?.data?.by_position ||
+    {};
 
   return (
     <div className="min-h-screen bg-[#0a0e16]">
       <Navbar />
 
-      {/* HERO */}
+      {/* HERO (unchanged) */}
       <section className="relative overflow-hidden border-b border-slate-800">
         <div className="absolute inset-0 bg-grid opacity-30" />
         <div className="relative max-w-7xl mx-auto px-4 py-20">
-
-          {/* content unchanged... */}
-
+          <h1 className="text-white text-4xl font-bold">
+            FantasyLab Dashboard
+          </h1>
         </div>
       </section>
 
-      {/* MATCHUPS OF THE WEEK */}
-      {matchups?.by_position && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      {/* MATCHUPS */}
+      {Object.keys(byPos).length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 py-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {["RB", "WR", "QB", "TE"].map((pos) => (
               <MatchupColumn
                 key={pos}
                 pos={pos}
-                data={matchups?.by_position?.[pos] ?? { soft: [], tough: [] }}
+                data={byPos[pos] || { soft: [], tough: [] }}
               />
             ))}
           </div>
@@ -48,14 +81,18 @@ export default function Home() {
       )}
 
       {/* MOVERS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <MoverList title="Breakout Candidates" players={movers?.breakouts ?? []} accent="emerald" />
-          <MoverList title="Bust Risks" players={movers?.busts ?? []} accent="red" />
-        </div>
+      <section className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <MoverList
+          title="Breakout Candidates"
+          players={movers?.breakouts}
+        />
+        <MoverList
+          title="Bust Risks"
+          players={movers?.busts}
+        />
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <section className="max-w-7xl mx-auto px-4 pb-20">
         <AdSlot slot="home-bottom" />
       </section>
     </div>
@@ -65,56 +102,55 @@ export default function Home() {
 /* ---------------- SAFE COMPONENTS ---------------- */
 
 function MatchupColumn({ pos, data }) {
-  const soft = data?.soft ?? [];
-  const tough = data?.tough ?? [];
+  const soft = data?.soft || [];
+  const tough = data?.tough || [];
 
   return (
-    <div className="bg-slate-950/60 border border-slate-800 rounded-md overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+    <div className="bg-slate-950/60 border border-slate-800 rounded-md p-3">
+      <div className="flex items-center gap-2 mb-2">
         <PositionBadge position={pos} />
-        <h3 className="font-bold text-white">{pos}s</h3>
+        <span className="text-white font-bold">{pos}</span>
       </div>
 
-      <div className="px-4 pt-3 pb-1 text-[10px] uppercase text-emerald-400">Smash spots</div>
-      <ul className="px-2">
-        {soft.slice(0, 3).map((r, i) => (
-          <li key={`s-${i}`} className="text-xs flex justify-between">
-            <span>{r.offense_team}</span>
-          </li>
-        ))}
-        {soft.length === 0 && <li className="text-xs text-slate-600">—</li>}
-      </ul>
+      <div className="text-xs text-emerald-400 mb-1">Smash</div>
+      {soft.slice(0, 3).map((r, i) => (
+        <div key={i} className="text-xs text-white">
+          {r.offense_team || "—"}
+        </div>
+      ))}
 
-      <div className="px-4 pt-3 pb-1 text-[10px] uppercase text-red-400">Avoid</div>
-      <ul className="px-2 pb-3">
-        {tough.slice(0, 3).map((r, i) => (
-          <li key={`t-${i}`} className="text-xs flex justify-between">
-            <span>{r.offense_team}</span>
-          </li>
-        ))}
-        {tough.length === 0 && <li className="text-xs text-slate-600">—</li>}
-      </ul>
+      <div className="text-xs text-red-400 mt-2 mb-1">Avoid</div>
+      {tough.slice(0, 3).map((r, i) => (
+        <div key={i} className="text-xs text-white">
+          {r.offense_team || "—"}
+        </div>
+      ))}
     </div>
   );
 }
 
-function MoverList({ title, players = [], accent }) {
+function MoverList({ title, players = [] }) {
+  const safePlayers = Array.isArray(players) ? players : [];
+
   return (
     <div className="bg-slate-950/60 border border-slate-800 rounded-md">
-      <div className="px-4 py-3 border-b border-slate-800">
-        <h3 className="font-bold text-white">{title}</h3>
+      <div className="p-3 border-b border-slate-800 text-white font-bold">
+        {title}
       </div>
 
-      <ul>
-        {(players ?? []).slice(0, 8).map((p) => (
-          <li key={p.id} className="px-4 py-2 text-sm text-white">
+      <div>
+        {safePlayers.slice(0, 8).map((p) => (
+          <div key={p.id} className="p-3 text-white text-sm">
             {p.name}
-          </li>
+          </div>
         ))}
-        {(!players || players.length === 0) && (
-          <li className="px-4 py-4 text-sm text-slate-500">No players yet.</li>
+
+        {safePlayers.length === 0 && (
+          <div className="p-4 text-slate-500 text-sm">
+            No players yet.
+          </div>
         )}
-      </ul>
+      </div>
     </div>
   );
 }
