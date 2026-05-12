@@ -7,7 +7,7 @@ const BACKEND_URL =
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({
-  baseURL: API,
+  baseURL: "https://fantasy-jq2t.onrender.com/api",
   withCredentials: true,
 });
 
