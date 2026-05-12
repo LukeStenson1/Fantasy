@@ -26,13 +26,13 @@ from backend.auth import (
     get_current_user_from_request, require_user,
 )
 from .llm_service import generate_player_outlook
-from nfl_data_service import (
+from .nfl_data_service import (
     refresh_player_data, get_def_rank, matchup_score,
     DEF_VS_POS_2024, get_next_opponent, get_next_opponent_team,
     player_news_search_url, get_def_dvp, get_dvp_table,
     hydrate_dvp_cache, hydrate_next_opp_cache,
 )
-from espn_injuries import refresh_injuries, injury_penalty
+from .espn_injuries import refresh_injuries, injury_penalty
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("ffref")
