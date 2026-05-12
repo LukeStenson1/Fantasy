@@ -47,26 +47,24 @@ def decode_token(token: str) -> dict:
 
 def set_auth_cookies(response, access_token: str, refresh_token: str):
     response.set_cookie(
-    key="access_token",
-    value=access_token,
-    httponly=True,
-    secure=True,
-    samesite="none",
-    domain="fantasy-jq2t.onrender.com",
-    path="/",
-    max_age=60 * 60 * 24,
-)
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=60 * 60 * 24,
+    )
 
-response.set_cookie(
-    key="refresh_token",
-    value=refresh_token,
-    httponly=True,
-    secure=True,
-    samesite="none",
-    domain="fantasy-jq2t.onrender.com",
-    path="/",
-    max_age=60 * 60 * 24 * 7,
-)
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=60 * 60 * 24 * 7,
+    )
 
 
 def clear_auth_cookies(response):
