@@ -52,11 +52,7 @@ export default function Home() {
       .catch((err) => console.error("matchups error", err));
   }, []);
 
-  const byPos =
-    matchups?.by_position ||
-    matchups?.byPosition ||
-    matchups?.data?.by_position ||
-    {};
+  const byPos = matchups?.by_position ?? {};
 
   return (
     <div className="min-h-screen bg-[#0a0e16]">
