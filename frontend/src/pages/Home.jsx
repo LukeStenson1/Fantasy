@@ -26,7 +26,7 @@ export default function Home() {
     elites: [],
   });
 
-  const [matchups, setMatchups] = useState(null);
+  const [matchups, setMatchups] = useState({});
 
   useEffect(() => {
     // SUMMARY
