@@ -1194,9 +1194,14 @@ async def shutdown():
 app.include_router(api)
 
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+
 allowed = [
-    "https://fantasy-px0g20.pages.dev",  # your deployed frontend
-    "http://localhost:3000",             # local dev
+    frontend_url,
+    "http://localhost:3000",
+
+    # ✅ Vercel deployments (add both just in case)
+    "https://fantasy-sigma-black.vercel.app",
+    "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
 ]
 
 app.add_middleware(
