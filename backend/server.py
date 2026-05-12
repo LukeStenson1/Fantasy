@@ -19,7 +19,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
-from auth import (
+from backend.auth import (
     hash_password, verify_password,
     create_access_token, create_refresh_token, decode_token,
     set_auth_cookies, clear_auth_cookies,
