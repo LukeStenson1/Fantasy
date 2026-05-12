@@ -6,9 +6,6 @@ import AdSlot from "../components/AdSlot";
 import { PositionBadge } from "../components/Badges";
 
 /* ---------------- SAFE NORMALIZER ---------------- */
-const safeArray = (v) =>
-  Array.isArray(v) ? v : v?.items || v?.data || [];
-
 const safeObject = (v, fallback = {}) =>
   v && typeof v === "object" ? v : fallback;
 
@@ -37,13 +34,13 @@ export default function Home() {
     // MOVERS
     api.get("/sleepers-busts", { params: { scoring: "half_ppr" } })
       .then((r) => {
-  setMovers({
-    sleepers: r.data?.sleepers || [],
-    busts: r.data?.busts || [],
-    breakouts: r.data?.breakouts || [],
-    elites: r.data?.elites || [],
-  });
-})
+        setMovers({
+          sleepers: r.data?.sleepers || [],
+          busts: r.data?.busts || [],
+          breakouts: r.data?.breakouts || [],
+          elites: r.data?.elites || [],
+        });
+      })
       .catch((err) => console.error("movers error", err));
 
     // MATCHUPS
@@ -58,7 +55,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#0a0e16]">
       <Navbar />
 
-      {/* HERO (unchanged) */}
+      {/* HERO */}
       <section className="relative overflow-hidden border-b border-slate-800">
         <div className="absolute inset-0 bg-grid opacity-30" />
         <div className="relative max-w-7xl mx-auto px-4 py-20">
@@ -68,20 +65,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MATCHUPS */}
-      {Object.keys(byPos).length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {["RB", "WR", "QB", "TE"].map((pos) => (
-              <MatchupColumn
-                key={pos}
-                pos={pos}
-                data={byPos[pos] || { soft: [], tough: [] }}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* MATCHUPS (FIXED: no conditional rendering) */}
+      <section className="max-w-7xl mx-auto px-4 py-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {["RB", "WR", "QB", "TE"].map((pos) => (
+            <MatchupColumn
+              key={pos}
+              pos={pos}
+              data={byPos[pos] || { soft: [], tough: [] }}
+            />
+          ))}
+        </div>
+      </section>
 
       {/* MOVERS */}
       <section className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -102,7 +97,7 @@ export default function Home() {
   );
 }
 
-/* ---------------- SAFE COMPONENTS ---------------- */
+/* ---------------- MATCHUP COLUMN ---------------- */
 
 function MatchupColumn({ pos, data }) {
   const soft = data?.soft || [];
@@ -131,6 +126,8 @@ function MatchupColumn({ pos, data }) {
     </div>
   );
 }
+
+/* ---------------- MOVERS ---------------- */
 
 function MoverList({ title, players = [] }) {
   const safePlayers = Array.isArray(players) ? players : [];
