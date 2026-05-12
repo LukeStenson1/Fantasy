@@ -25,7 +25,7 @@ from backend.auth import (
     set_auth_cookies, clear_auth_cookies,
     get_current_user_from_request, require_user,
 )
-from llm_service import generate_player_outlook
+from .llm_service import generate_player_outlook
 from nfl_data_service import (
     refresh_player_data, get_def_rank, matchup_score,
     DEF_VS_POS_2024, get_next_opponent, get_next_opponent_team,
