@@ -36,7 +36,14 @@ export default function Home() {
 
     // MOVERS
     api.get("/sleepers-busts", { params: { scoring: "half_ppr" } })
-      .then((r) => setMovers(safeObject(r.data)))
+      .then((r) => {
+  setMovers({
+    sleepers: r.data?.sleepers || [],
+    busts: r.data?.busts || [],
+    breakouts: r.data?.breakouts || [],
+    elites: r.data?.elites || [],
+  });
+})
       .catch((err) => console.error("movers error", err));
 
     // MATCHUPS
