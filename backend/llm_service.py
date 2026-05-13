@@ -89,7 +89,7 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = await model.generate_content_async(prompt)
         return response.text.strip()
     except Exception as e:
@@ -132,7 +132,7 @@ async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = await model.generate_content_async(prompt)
         return response.text.strip()
     except Exception as e:
