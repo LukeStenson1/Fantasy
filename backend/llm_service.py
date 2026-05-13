@@ -1,8 +1,6 @@
-"""LLM service for player outlook generation using Claude via Anthropic API."""
+"""LLM service for player outlook generation using Google Gemini API (free tier)."""
 import os
-import uuid
-from anthropic import AsyncAnthropic
-
+import google.generativeai as genai
 
 SYSTEM_MSG = (
     "You are an expert fantasy football analyst. Given a player's recent stats, team context, "
@@ -15,9 +13,8 @@ SYSTEM_MSG = (
 ROOKIE_SYSTEM_MSG = (
     "You are an expert fantasy football analyst specializing in rookie projections. Given a rookie's draft slot, "
     "landing spot, college production, team scheme, depth chart, and projected role, produce a focused player+team "
-    "outlook for their NFL career trajectory — NOT a single-week matchup. Cover: 1) Team fit & how the offense will "
-    "deploy them, 2) Year-1 fantasy expectation (target/touch share, snap %), 3) Multi-year ceiling. As real-season "
-    "games happen, this outlook should update naturally because new stats feed back into the dataset. "
+    "outlook for their NFL career trajectory. Cover: 1) Team fit & how the offense will deploy them, "
+    "2) Year-1 fantasy expectation (target/touch share, snap %), 3) Multi-year ceiling. "
     "Format as 3 short sections: Player + Team Fit, Year-1 Expectation, Long-Term Ceiling. Plain text, no markdown."
 )
 
@@ -25,27 +22,35 @@ TRADE_SYSTEM_MSG = (
     "You are an expert fantasy football trade analyst. Given two sides of a proposed trade with each "
     "player's live Lab Score, current team, next opponent + matchup difficulty (DvP rank), live injury "
     "status, and tag (elite/breakout/sleeper/risk), produce a concise, opinionated verdict. Always factor "
-    "in injury status — if a player is OUT/IR, they have no near-term value. Always factor matchup "
-    "difficulty for the upcoming week. Format: VERDICT (one line, who wins and by how much), "
+    "in injury status — if a player is OUT/IR, they have no near-term value. "
+    "Format: VERDICT (one line, who wins and by how much), "
     "WHY (3-5 bullets covering injury, matchup, value tier, age/role), RECOMMENDATION (1-2 sentences). "
     "Plain text. No markdown. Be direct and useful, not generic."
 )
 
-client = AsyncAnthropic(
-    api_key=os.environ.get("EMERGENT_LLM_KEY")
-)
+
+def _get_gemini_client():
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        system_instruction=None,
+    )
 
 
 async def generate_player_outlook(player: dict, news_items: list, scoring: str = "half_ppr") -> str:
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return "AI outlook unavailable: EMERGENT_LLM_KEY not configured."
+        return "AI outlook unavailable: GEMINI_API_KEY not configured."
 
     is_rookie = (player.get("experience", 99) == 0) or (player.get("rookie_info") is not None)
     rinfo = player.get("rookie_info") or {}
 
     if is_rookie:
         prompt = (
+            f"{ROOKIE_SYSTEM_MSG}\n\n"
             f"ROOKIE: {player.get('name')} | {player.get('position')} | {player.get('team')}\n"
             f"DRAFT: Round {((rinfo.get('draft_number') or 999) - 1) // 32 + 1 if rinfo.get('draft_number') else '?'} "
             f"(Pick #{rinfo.get('draft_number','?')})\n"
@@ -54,7 +59,6 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
             f"SCORING: {scoring.replace('_',' ').upper()}\n\n"
             "Produce the rookie outlook as instructed."
         )
-        sys_msg = ROOKIE_SYSTEM_MSG
     else:
         last_season = (player.get("seasons") or [{}])[-1]
         news_summary = "\n".join(
@@ -65,12 +69,13 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         inj_short = player.get("injury_short")
         inj_line = ""
         if inj_status:
-            inj_line = f"INJURY (LIVE, ESPN): {inj_status}"
+            inj_line = f"INJURY (LIVE): {inj_status}"
             if inj_short:
                 inj_line += f" — {inj_short[:200]}"
             inj_line += "\n"
 
         prompt = (
+            f"{SYSTEM_MSG}\n\n"
             f"PLAYER: {player.get('name')} | {player.get('position')} | {player.get('team')}\n"
             f"AGE: {player.get('age', 'N/A')} | EXPERIENCE: {player.get('experience','N/A')} yrs\n"
             f"SCORING: {scoring.replace('_', ' ').upper()}\n"
@@ -79,21 +84,14 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
             f"GP {last_season.get('games',0)}, FPTS/G {last_season.get('fpts_per_game_half_ppr',0)}, "
             f"YDs {last_season.get('total_yards',0)}, TDs {last_season.get('total_tds',0)}\n"
             f"NEWS:\n{news_summary}\n\n"
-            "Produce the outlook as instructed. If an injury is listed above, weight it heavily in Risk Factors."
+            "Produce the outlook as instructed."
         )
-        sys_msg = SYSTEM_MSG
 
     try:
-        resp = await client.messages.create(
-            model="claude-3-5-sonnet-latest",
-            max_tokens=800,
-            system=sys_msg,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return resp.content[0].text.strip()
-
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = await model.generate_content_async(prompt)
+        return response.text.strip()
     except Exception as e:
         return f"AI outlook unavailable: {e}"
 
@@ -109,7 +107,6 @@ def _format_trade_side(label: str, side: dict) -> str:
         tag = p.get("tag") or "—"
         fppg = p.get("current_fpts_per_game") or 0
         fpa_str = f", {fpa:.1f} allowed/G" if fpa else ""
-
         lines.append(
             f"  - {p['name']} ({p['position']}, {p['team']}) | LabScore {p['lineup_score']:.1f} | "
             f"{fppg:.1f} FPts/G last yr | next: vs {opp} (D rank #{rank}{fpa_str}) | "
@@ -120,11 +117,12 @@ def _format_trade_side(label: str, side: dict) -> str:
 
 async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a: dict, side_b: dict,
                                   diff: float, verdict: str, scoring: str) -> str:
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        return "AI verdict unavailable: EMERGENT_LLM_KEY not configured."
+        return "AI verdict unavailable: GEMINI_API_KEY not configured."
 
     prompt = (
+        f"{TRADE_SYSTEM_MSG}\n\n"
         f"SCORING: {scoring.replace('_', ' ').upper()}\n"
         f"LAB-SCORE DIFF: {diff:+.1f} ({verdict.replace('_', ' ')})\n\n"
         f"{_format_trade_side(side_a_label, side_a)}\n\n"
@@ -133,15 +131,9 @@ async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a
     )
 
     try:
-        resp = await client.messages.create(
-            model="claude-3-5-sonnet-latest",
-            max_tokens=900,
-            system=TRADE_SYSTEM_MSG,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return resp.content[0].text.strip()
-
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = await model.generate_content_async(prompt)
+        return response.text.strip()
     except Exception as e:
         return f"AI verdict unavailable: {e}"
