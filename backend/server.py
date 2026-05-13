@@ -1191,7 +1191,7 @@ async def shutdown():
     client.close()
 
 
-app.include_router(api)
+app.include_router(api, prefix="/api")
 
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
