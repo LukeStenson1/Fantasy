@@ -950,7 +950,7 @@ async def analyze_trade(payload: TradeIn):
         verdict = "side_a_wins"
 
     # AI commentary — concise, uses live factors
-    from llm_service import generate_trade_verdict
+    from .llm_service import generate_trade_verdict
     commentary = await generate_trade_verdict(
         side_a_label=payload.side_a_label or "Side A",
         side_b_label=payload.side_b_label or "Side B",
