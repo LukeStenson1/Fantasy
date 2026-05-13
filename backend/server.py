@@ -42,10 +42,26 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
 app = FastAPI(title="Fantasy Lab API")
+
+frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+allowed = [
+    frontend_url,
+    "http://localhost:3000",
+    "https://fantasy-sigma-black.vercel.app",
+    "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
+    "https://fantasy-gwzjo8enr-lukestenson1s-projects.vercel.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 api = APIRouter()
-
 app.include_router(api, prefix="/api")
-
 
 # ---------- Models ----------
 class RegisterIn(BaseModel):
@@ -1191,27 +1207,6 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     client.close()
-
-
-app.include_router(api, prefix="/api")
-
-frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-
-allowed = [
-    frontend_url,
-    "http://localhost:3000",
-    "https://fantasy-sigma-black.vercel.app",
-    "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
-    "https://fantasy-gwzjo8enr-lukestenson1s-projects.vercel.app",  # NEW ONE
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 if __name__ == "__main__":
     import uvicorn
