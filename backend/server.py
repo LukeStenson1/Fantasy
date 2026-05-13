@@ -43,19 +43,9 @@ db = client[os.environ["DB_NAME"]]
 
 app = FastAPI(title="Fantasy Lab API")
 
-frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-allowed = [
-    frontend_url,
-    "http://localhost:3000",
-    "https://fantasy-sigma-black.vercel.app",
-    "https://fantasy-6fqijxm6-lukestenson1s-projects.vercel.app",  # ← ADD THIS
-    "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
-    "https://fantasy-gwzjo8enr-lukestenson1s-projects.vercel.app",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed,
+    allow_origin_regex=r"https://fantasy(-[a-z0-9]+)*(-lukestenson1s-projects)?\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
