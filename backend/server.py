@@ -48,6 +48,7 @@ allowed = [
     frontend_url,
     "http://localhost:3000",
     "https://fantasy-sigma-black.vercel.app",
+    "https://fantasy-6fqijxm6-lukestenson1s-projects.vercel.app",  # ← ADD THIS
     "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
     "https://fantasy-gwzjo8enr-lukestenson1s-projects.vercel.app",
 ]
