@@ -1200,6 +1200,7 @@ allowed = [
     "http://localhost:3000",
     "https://fantasy-sigma-black.vercel.app",
     "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
+    "https://fantasy-gwzjo8enr-lukestenson1s-projects.vercel.app",  # NEW ONE
 ]
 
 app.add_middleware(
