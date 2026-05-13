@@ -52,7 +52,6 @@ app.add_middleware(
 )
 
 api = APIRouter()
-app.include_router(api, prefix="/api")
 
 # ---------- Models ----------
 class RegisterIn(BaseModel):
@@ -1198,6 +1197,8 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     client.close()
+
+app.include_router(api, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
