@@ -1198,8 +1198,6 @@ frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 allowed = [
     frontend_url,
     "http://localhost:3000",
-
-    # ✅ Vercel deployments (add both just in case)
     "https://fantasy-sigma-black.vercel.app",
     "https://fantasy-6abeq9ptu-lukestenson1s-projects.vercel.app",
 ]
