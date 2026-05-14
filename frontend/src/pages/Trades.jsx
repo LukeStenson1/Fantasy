@@ -137,7 +137,7 @@ function SideBuilder({ title, side, setSide, otherSide, scoring, accent, testid 
     <div className={`bg-slate-950/60 border ${accentBar} rounded-md p-5`} data-testid={testid}>
       <div className={`text-[10px] font-bold tracking-[0.2em] uppercase ${accentText} mb-3`}>{title}</div>
       <div className="relative mb-3">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search any player…"
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search any player, K, or D/ST…"
           className="bg-slate-900 border-slate-700 text-white placeholder:text-slate-500" data-testid={`${testid}-search`} />
         {results.length > 0 && (
           <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-md max-h-60 overflow-auto z-20 shadow-xl">
@@ -156,6 +156,7 @@ function SideBuilder({ title, side, setSide, otherSide, scoring, accent, testid 
           </div>
         )}
       </div>
+      <p className="text-xs text-slate-500 mt-1 mb-3">Tip: search a team name (e.g. "Bills") for D/ST.</p>
 
       {side.length === 0 ? (
         <div className="border border-dashed border-slate-700 rounded-md p-6 text-center text-sm text-slate-500" data-testid={`${testid}-empty`}>
@@ -188,7 +189,6 @@ function TradeResult({ result }) {
 
   return (
     <div className="space-y-4" data-testid="trade-result">
-      {/* Verdict header */}
       <div className="bg-slate-950/60 border border-slate-800 rounded-md p-5">
         <div className="flex items-center gap-3 flex-wrap">
           <div className={`w-1 h-10 ${meta.bar}`} />
@@ -211,13 +211,11 @@ function TradeResult({ result }) {
         </div>
       </div>
 
-      {/* Side breakdowns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SideResult label={result.side_a_label} side={result.side_a} testid="trade-side-a" />
         <SideResult label={result.side_b_label} side={result.side_b} testid="trade-side-b" />
       </div>
 
-      {/* AI commentary */}
       <div className="bg-slate-950/60 border border-emerald-500/20 rounded-md" data-testid="trade-commentary">
         <div className="px-5 py-3 border-b border-slate-800 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-400" />
