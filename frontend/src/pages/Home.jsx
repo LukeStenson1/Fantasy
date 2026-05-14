@@ -113,8 +113,8 @@ export default function Home() {
             All players <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {["RB", "WR", "QB", "TE"].map((pos) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {["RB", "WR", "QB", "TE", "DEF"].map((pos) => (
             <MatchupColumn key={pos} pos={pos} data={byPos[pos] || { soft: [], tough: [] }} />
           ))}
         </div>
