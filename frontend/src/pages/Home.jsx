@@ -124,7 +124,7 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-4 pb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-white font-bold text-lg tracking-tight">Players to Watch</h2>
-          <Link to="/sleepers-busts" className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+          <Link to="/draft-board" className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
             Full analysis <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
