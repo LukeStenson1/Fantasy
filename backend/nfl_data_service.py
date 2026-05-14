@@ -25,7 +25,7 @@ logger = logging.getLogger("ffref.data")
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
 # Per-position player count caps (top-N by fantasy points in latest season)
-TOP_N = {"QB": 32, "RB": 75, "WR": 75, "TE": 35, "K": 35}
+TOP_N = {"QB": 32, "RB": 70, "WR": 70, "TE": 32, "K": 32}
 
 # Team-code normalization — nflverse uses slightly different codes across data sources.
 # Canonical form aligns with our DvP map + schedule + ESPN injuries map (LAR not LA, etc.).
