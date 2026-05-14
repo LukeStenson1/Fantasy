@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Plus, Trash2, X, Brain, Target } from "lucide-react";
+import { Plus, Trash2, X, Brain, Target, RefreshCw, Database, Shield } from "lucide-react";
 import { PositionBadge } from "../components/Badges";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
@@ -27,6 +27,7 @@ export default function MyRankings() {
   const [lineups, setLineups] = useState([]);
   const [predStats, setPredStats] = useState(null);
   const [dataStatus, setDataStatus] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [scoring, setScoring] = useState("half_ppr");
@@ -80,6 +81,32 @@ export default function MyRankings() {
     toast.success("Deleted");
   };
 
+  const forceRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await api.post("/admin/refresh-data?force=true");
+      toast.success(`Data refreshed — ${data.players} players, seasons ${(data.seasons || []).join(", ")}`);
+      api.get("/admin/data-status").then((r) => setDataStatus(r.data));
+    } catch {
+      toast.error("Refresh failed — check Render logs");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshInjuries = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await api.post("/admin/refresh-injuries");
+      toast.success(`Injuries refreshed — ${data.matched || 0} players updated`);
+      api.get("/admin/data-status").then((r) => setDataStatus(r.data));
+    } catch {
+      toast.error("Injury refresh failed");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0e16]">
       <Navbar />
@@ -95,7 +122,66 @@ export default function MyRankings() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        {/* SELF-LEARNING STATS (FIXED) */}
+        {/* ADMIN PANEL — only visible to admin */}
+        {user?.role === "admin" && (
+          <div className="bg-slate-950/60 border border-amber-500/20 rounded-md p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-5 h-5 text-amber-400" />
+              <h2 className="font-display font-bold text-lg text-white">Admin Panel</h2>
+            </div>
+
+            {/* Data status */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              <div className="bg-slate-900 border border-slate-800 rounded-md p-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Players</div>
+                <div className="font-mono-tab text-xl font-bold text-white">{dataStatus?.player_count ?? "—"}</div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-md p-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Seasons</div>
+                <div className="font-mono-tab text-sm font-bold text-white">
+                  {dataStatus?.last_refresh?.seasons?.join(", ") ?? "—"}
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-md p-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Last Refresh</div>
+                <div className="font-mono-tab text-sm font-bold text-white">
+                  {relativeTime(dataStatus?.last_refresh?.value)}
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-md p-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Injured</div>
+                <div className="font-mono-tab text-xl font-bold text-white">{dataStatus?.injured_count ?? "—"}</div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={forceRefresh}
+                disabled={refreshing}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Refreshing…" : "Force Refresh Player Data"}
+              </Button>
+              <Button
+                onClick={refreshInjuries}
+                disabled={refreshing}
+                variant="outline"
+                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                <Database className="w-4 h-4 mr-2" />
+                Refresh Injuries
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              Force refresh pulls latest nflverse data including new seasons, trades, and roster changes.
+              Run this at the start of each week during the season.
+            </p>
+          </div>
+        )}
+
+        {/* SELF-LEARNING STATS */}
         <div className="bg-slate-950/60 border border-emerald-500/20 rounded-md p-5">
           <div className="flex items-center gap-2 mb-3">
             <Brain className="w-5 h-5 text-emerald-400" />
@@ -119,7 +205,6 @@ export default function MyRankings() {
                   ? `${s.bias > 0 ? "+" : ""}${s.bias.toFixed(1)}`
                   : "—";
                 const n = s?.n ?? 0;
-
                 return (
                   <div key={pos} className="border border-slate-800 rounded-md p-3 bg-slate-950/40">
                     <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{pos}</div>
@@ -132,7 +217,7 @@ export default function MyRankings() {
           )}
         </div>
 
-        {/* EVERYTHING ELSE UNCHANGED */}
+        {/* RANKINGS & LINEUPS */}
         <Tabs defaultValue="rankings">
           <TabsList>
             <TabsTrigger value="rankings">Rankings ({rankings.length})</TabsTrigger>
@@ -140,11 +225,78 @@ export default function MyRankings() {
           </TabsList>
 
           <TabsContent value="rankings">
-            {/* unchanged rest of your UI */}
+            <div className="mt-4 space-y-3">
+              <Button onClick={() => setCreating(!creating)} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">
+                <Plus className="w-4 h-4 mr-1" /> New Ranking
+              </Button>
+
+              {creating && (
+                <div className="bg-slate-950/60 border border-slate-800 rounded-md p-5 space-y-4">
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ranking title…"
+                    className="bg-slate-900 border-slate-700 text-white" />
+                  <div className="relative">
+                    <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search players…"
+                      className="bg-slate-900 border-slate-700 text-white" />
+                    {results.length > 0 && (
+                      <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-md max-h-60 overflow-auto z-20">
+                        {results.map((p) => (
+                          <button key={p.id} onClick={() => addPick(p)}
+                            className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-800 text-left border-b border-slate-800 last:border-0">
+                            <PositionBadge position={p.position} />
+                            <span className="text-white font-semibold">{p.name}</span>
+                            <span className="text-xs text-slate-500">{p.team}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {picked.length > 0 && (
+                    <ul className="space-y-1">
+                      {picked.map((p, i) => (
+                        <li key={p.id} className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded px-3 py-2">
+                          <span className="text-slate-500 text-xs w-5">{i + 1}</span>
+                          <PositionBadge position={p.position} />
+                          <span className="text-white font-semibold flex-1">{p.name}</span>
+                          <button onClick={() => removePick(p.id)}><X className="w-4 h-4 text-slate-500 hover:text-red-400" /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex gap-2">
+                    <Button onClick={save} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">Save Ranking</Button>
+                    <Button variant="outline" onClick={() => setCreating(false)} className="border-slate-700 text-slate-300">Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {rankings.length === 0 && !creating && (
+                <p className="text-slate-500 text-sm">No rankings saved yet.</p>
+              )}
+              {rankings.map((r) => (
+                <div key={r.id} className="bg-slate-950/60 border border-slate-800 rounded-md p-4 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white">{r.title}</div>
+                    <div className="text-xs text-slate-500">{r.player_ids?.length} players · {r.scoring} · {relativeTime(r.created_at)}</div>
+                  </div>
+                  <button onClick={() => removeRanking(r.id)}><Trash2 className="w-4 h-4 text-slate-500 hover:text-red-400" /></button>
+                </div>
+              ))}
+            </div>
           </TabsContent>
 
           <TabsContent value="lineups">
-            {/* unchanged rest of your UI */}
+            <div className="mt-4 space-y-3">
+              {lineups.length === 0 && <p className="text-slate-500 text-sm">No lineups saved yet.</p>}
+              {lineups.map((l) => (
+                <div key={l.id} className="bg-slate-950/60 border border-slate-800 rounded-md p-4 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white">{l.title}</div>
+                    <div className="text-xs text-slate-500">{l.scoring} · {relativeTime(l.created_at)}</div>
+                  </div>
+                  <button onClick={() => removeLineup(l.id)}><Trash2 className="w-4 h-4 text-slate-500 hover:text-red-400" /></button>
+                </div>
+              ))}
+            </div>
           </TabsContent>
         </Tabs>
 
