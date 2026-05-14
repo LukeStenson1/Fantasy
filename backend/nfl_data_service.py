@@ -256,12 +256,18 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
     for entry in all_player_seasons.values():
         pos = entry["position"]
         if not entry["seasons"]:
-            # Pure rookie — keep aside
-            r = rookie_meta.get(entry["ext_id"])
-            if r:
-                entry["_rookie_score"] = -1 * (r.get("draft_number") or 999)
-                rookies_with_no_seasons.append(entry)
+        # Pure rookie — keep aside
+        r = rookie_meta.get(entry["ext_id"])
+        if r:
+            entry["_rookie_score"] = -1 * (r.get("draft_number") or 999)
+            rookies_with_no_seasons.append(entry)
             continue
+        # Kickers with no seasonal stats — keep them anyway
+        if entry["position"] == "K":
+            entry["_latest_fpts"] = 0
+            per_position.setdefault("K", []).append(entry)
+            continue
+        continue
         best = max((s.get("fpts_half_ppr", 0) for s in entry["seasons"]), default=0)
         entry["_latest_fpts"] = best
         per_position.setdefault(pos, []).append(entry)
