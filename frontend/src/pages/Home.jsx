@@ -78,7 +78,8 @@ export default function Home() {
       <div className="border-b border-slate-800 bg-slate-950/60">
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-white text-4xl font-bold">Dashboard</h1>
+            <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-2">◆ The Lab · Command Center</div>
+            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white">Dashboard</h1>
             <p className="text-slate-400 mt-2">
               {summary.total_players > 0
                 ? `${summary.total_players} players · seasons ${(summary.data_seasons || []).join(", ")}`
