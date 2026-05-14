@@ -13,7 +13,7 @@ import {
 } from "../components/ui/select";
 import { Search, X } from "lucide-react";
 
-const POSITIONS = ["ALL", "QB", "RB", "WR", "TE"];
+const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"];
 const SCORINGS = [
   { v: "half_ppr", l: "Half PPR" },
   { v: "ppr", l: "PPR" },
