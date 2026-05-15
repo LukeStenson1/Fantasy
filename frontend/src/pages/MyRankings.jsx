@@ -82,17 +82,26 @@ export default function MyRankings() {
   };
 
   const forceRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const { data } = await api.post("/admin/refresh-data", null, { params: { force: true } });
+  setRefreshing(true);
+  try {
+    const response = await api.post("/admin/refresh-data", null, { params: { force: true } });
+    const data = response.data;
+    console.log("Refresh response:", data);
+    if (data.status === "ok") {
       toast.success(`Data refreshed — ${data.players} players, seasons ${(data.seasons || []).join(", ")}`);
-      api.get("/admin/data-status").then((r) => setDataStatus(r.data));
-    } catch {
-      toast.error("Refresh failed — check Render logs");
-    } finally {
-      setRefreshing(false);
+    } else if (data.status === "skipped") {
+      toast.info(`Skipped — data is fresh (${data.players} players)`);
+    } else {
+      toast.error(`Refresh returned: ${JSON.stringify(data)}`);
     }
-  };
+    api.get("/admin/data-status").then((r) => setDataStatus(r.data));
+  } catch (e) {
+    console.error("Refresh error:", e);
+    toast.error(`Refresh failed: ${e.message}`);
+  } finally {
+    setRefreshing(false);
+  }
+};
 
   const refreshInjuries = async () => {
     setRefreshing(true);
