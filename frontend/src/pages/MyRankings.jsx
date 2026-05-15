@@ -84,7 +84,7 @@ export default function MyRankings() {
   const forceRefresh = async () => {
     setRefreshing(true);
     try {
-      const { data } = await api.post("/admin/refresh-data?force=true");
+      const { data } = await api.post("/admin/refresh-data", null, { params: { force: true } });
       toast.success(`Data refreshed — ${data.players} players, seasons ${(data.seasons || []).join(", ")}`);
       api.get("/admin/data-status").then((r) => setDataStatus(r.data));
     } catch {
