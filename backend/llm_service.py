@@ -1,6 +1,6 @@
 """LLM service for player outlook generation using Google Gemini API (free tier)."""
 import os
-import google.generativeai as genai
+from google import genai
 
 SYSTEM_MSG = (
     "You are an expert fantasy football analyst. Given a player's recent stats, team context, "
