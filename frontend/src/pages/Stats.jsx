@@ -19,7 +19,7 @@ const SCORINGS = [
   { v: "ppr", l: "PPR" },
   { v: "standard", l: "Standard" },
 ];
-const SEASONS = ["2024", "2023", "2022"];
+const SEASONS = ["2025", "2024", "2023", "2022"];
 
 export default function Stats() {
   const [position, setPosition] = useState("ALL");
