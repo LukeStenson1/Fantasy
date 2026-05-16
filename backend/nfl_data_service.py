@@ -192,7 +192,7 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
 
         # Fetch rosters
         try:
-            roster = nfl.load_rosters(seasons=[s])
+            roster = nfl.load_rosters([s])
             if hasattr(roster, 'to_pandas'):
                 roster = roster.to_pandas()
             if roster is not None and not roster.empty:
