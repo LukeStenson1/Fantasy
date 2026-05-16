@@ -328,7 +328,7 @@ def _fetch_schedule_sync(seasons: Iterable[int]):
 
     next_opp: dict[str, dict] = {}
     try:
-        sched = nfl.load_schedules(seasons=list(seasons))
+        sched = nfl.load_schedules(list(seasons))
         if hasattr(sched, 'to_pandas'):
             sched = sched.to_pandas()
         if sched is None or sched.empty:
