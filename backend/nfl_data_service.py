@@ -424,9 +424,15 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             pid = row.get("player_id")
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
                 continue
-            name = row.get("player_name") or row.get("player_display_name")
+            name = row.get("player_display_name") or row.get("player_name")
+            if hasattr(name, 'item'):
+                name = name.item()
             pos = row.get("position")
-            team = row.get("team") or row.get("recent_team")
+            team = row.get("recent_team") or row.get("team")
+            if hasattr(pos, 'item'):
+                pos = pos.item()
+            if hasattr(team, 'item'):
+                team = team.item()
             if not name or not pos or (isinstance(name, float) and pd.isna(name)):
                 continue
 
