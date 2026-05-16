@@ -225,7 +225,7 @@ def _fetch_weekly_sync(seasons: Iterable[int]):
     frames = []
     for s in seasons:
         try:
-            df = nfl.load_player_stats(seasons=[s])
+            df = nfl.load_player_stats([s])
             if hasattr(df, 'to_pandas'):
                 df = df.to_pandas()
             if df is not None and not df.empty:
