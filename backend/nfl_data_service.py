@@ -424,15 +424,22 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             pid = row.get("player_id")
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
                 continue
-            name = row.get("player_display_name") or row.get("player_name")
-            if hasattr(name, 'item'):
-                name = name.item()
-            pos = row.get("position")
-            team = row.get("recent_team") or row.get("team")
-            if hasattr(pos, 'item'):
-                pos = pos.item()
-            if hasattr(team, 'item'):
-                team = team.item()
+            def _scalar(v):
+                if v is None:
+                    return None
+                if hasattr(v, 'iloc'):
+                    v = v.iloc[0] if len(v) > 0 else None
+                elif hasattr(v, 'item'):
+                    try:
+                        v = v.item()
+                    except Exception:
+                        v = None
+                return v
+
+            name = _scalar(row.get("player_display_name")) or _scalar(row.get("player_name"))
+            pos = _scalar(row.get("position"))
+            team = _scalar(row.get("recent_team")) or _scalar(row.get("team"))
+
             if not name or not pos or (isinstance(name, float) and pd.isna(name)):
                 continue
 
