@@ -132,7 +132,7 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
     for s in seasons:
         # Fetch seasonal player stats
         try:
-            df = nfl.load_player_stats(seasons=[s])
+            df = nfl.load_player_stats([s])
             # Convert polars to pandas if needed
             if hasattr(df, 'to_pandas'):
                 df = df.to_pandas()
