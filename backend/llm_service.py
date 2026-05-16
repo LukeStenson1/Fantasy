@@ -29,15 +29,8 @@ TRADE_SYSTEM_MSG = (
 )
 
 
-def _get_gemini_client():
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return None
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction=None,
-    )
+def _get_client(api_key: str):
+    return genai.Client(api_key=api_key)
 
 
 async def generate_player_outlook(player: dict, news_items: list, scoring: str = "half_ppr") -> str:
@@ -88,9 +81,11 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         )
 
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = await model.generate_content_async(prompt)
+        client = _get_client(api_key)
+        response = await client.aio.models.generate_content(
+            model="gemini-2.5-flash-preview-04-17",
+            contents=prompt,
+        )
         return response.text.strip()
     except Exception as e:
         return f"AI outlook unavailable: {e}"
@@ -131,9 +126,11 @@ async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a
     )
 
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = await model.generate_content_async(prompt)
+        client = _get_client(api_key)
+        response = await client.aio.models.generate_content(
+            model="gemini-2.5-flash-preview-04-17",
+            contents=prompt,
+        )
         return response.text.strip()
     except Exception as e:
         return f"AI verdict unavailable: {e}"
