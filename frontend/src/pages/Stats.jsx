@@ -19,7 +19,8 @@ const SCORINGS = [
   { v: "ppr", l: "PPR" },
   { v: "standard", l: "Standard" },
 ];
-const SEASONS = ["2025", "2024", "2023", "2022"];
+const currentYear = new Date().getFullYear();
+const SEASONS = Array.from({length: 4}, (_, i) => String(currentYear - i));
 
 export default function Stats() {
   const [position, setPosition] = useState("ALL");
