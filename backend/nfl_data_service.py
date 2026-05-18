@@ -118,7 +118,6 @@ def _detect_tag(seasons: list[dict], position: str) -> str | None:
     return None
 
 def _fetch_seasons_sync(seasons: Iterable[int]):
-    """Fetch seasonal stats and rosters using nflreadpy."""
     try:
         import nflreadpy as nfl
         import pandas as pd
@@ -130,56 +129,34 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
     roster_dfs = {}
 
     for s in seasons:
-        # Fetch seasonal player stats
         try:
             df = nfl.load_player_stats([s])
-            # Convert polars to pandas if needed
             if hasattr(df, 'to_pandas'):
                 df = df.to_pandas()
-            # Filter to seasonal (aggregate) — nflreadpy returns weekly by default
-            # Group by player_id to get season totals
             if df is not None and not df.empty:
                 agg_cols = {
-                    'games': 'count',
-                    'passing_yards': 'sum',
-                    'passing_tds': 'sum',
-                    'interceptions': 'sum',
-                    'rushing_yards': 'sum',
-                    'rushing_tds': 'sum',
-                    'carries': 'sum',
-                    'receptions': 'sum',
-                    'targets': 'sum',
-                    'receiving_yards': 'sum',
-                    'receiving_tds': 'sum',
-                    'rushing_fumbles_lost': 'sum',
-                    'receiving_fumbles_lost': 'sum',
-                    'sack_fumbles_lost': 'sum',
+                    'passing_yards': 'sum', 'passing_tds': 'sum', 'interceptions': 'sum',
+                    'rushing_yards': 'sum', 'rushing_tds': 'sum', 'carries': 'sum',
+                    'receptions': 'sum', 'targets': 'sum', 'receiving_yards': 'sum',
+                    'receiving_tds': 'sum', 'rushing_fumbles_lost': 'sum',
+                    'receiving_fumbles_lost': 'sum', 'sack_fumbles_lost': 'sum',
                 }
-                # Only aggregate columns that exist
                 existing_cols = {k: v for k, v in agg_cols.items() if k in df.columns}
-                # Count games as number of rows per player
                 if 'player_id' in df.columns:
                     games_count = df.groupby('player_id').size().reset_index(name='games')
-                    agg_existing = {k: v for k, v in existing_cols.items() if k != 'games'}
-                    if agg_existing:
-                        seasonal = df.groupby('player_id').agg(agg_existing).reset_index()
+                    if existing_cols:
+                        seasonal = df.groupby('player_id').agg(existing_cols).reset_index()
                         seasonal = seasonal.merge(games_count, on='player_id', how='left')
                     else:
                         seasonal = games_count
-                    # Add player name/position from first occurrence
                     meta_cols = ['player_id']
                     for col in ['player_display_name', 'player_name', 'position', 'recent_team']:
                         if col in df.columns:
                             meta_cols.append(col)
-                    meta = df.groupby('player_id')[meta_cols[1:]].first().reset_index() if len(meta_cols) > 1 else pd.DataFrame()
-                    if not meta.empty:
+                    if len(meta_cols) > 1:
+                        meta = df.groupby('player_id')[meta_cols[1:]].first().reset_index()
                         seasonal = seasonal.merge(meta, on='player_id', how='left')
-                    # Rename columns to match expected format
-                    rename_map = {
-                        'player_display_name': 'player_name',
-                        'recent_team': 'team',
-                    }
-                    seasonal = seasonal.rename(columns=rename_map)
+                    seasonal = seasonal.rename(columns={'player_display_name': 'player_name', 'recent_team': 'team'})
                     seasonal_dfs[s] = seasonal
                     logger.info(f"Fetched {s} seasonal stats: {len(seasonal)} players")
                 else:
@@ -190,13 +167,11 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
             logger.warning(f"Season {s} stats not available via nflreadpy: {e}")
             seasonal_dfs[s] = None
 
-        # Fetch rosters
         try:
             roster = nfl.load_rosters([s])
             if hasattr(roster, 'to_pandas'):
                 roster = roster.to_pandas()
             if roster is not None and not roster.empty:
-                # Rename columns to match expected format
                 rename_map = {}
                 if 'gsis_id' in roster.columns and 'player_id' not in roster.columns:
                     rename_map['gsis_id'] = 'player_id'
@@ -206,18 +181,14 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
                     roster = roster.rename(columns=rename_map)
                 roster_dfs[s] = roster
                 logger.info(f"Fetched {s} rosters: {len(roster)} players")
-                if s == 2026 and roster is not None and not roster.empty:
-                    cols = list(roster.columns)
-                    logger.info(f"2026 roster columns: {cols}")
-                    if "years_exp" in roster.columns:
-                        exp_counts = roster["years_exp"].value_counts().head(10).to_dict()
-                        logger.info(f"2026 years_exp distribution: {exp_counts}")
-                    if "draft_year" in roster.columns:
-                        dy_counts = roster["draft_year"].value_counts().head(5).to_dict()
-                        logger.info(f"2026 draft_year distribution: {dy_counts}")
+                if s == 2026:
+                    logger.info(f"2026 roster columns: {list(roster.columns)}")
                     if "entry_year" in roster.columns:
-                        ey_counts = roster["entry_year"].value_counts().head(5).to_dict()
-                        logger.info(f"2026 entry_year distribution: {ey_counts}")
+                        ey = roster["entry_year"].value_counts().head(5).to_dict()
+                        logger.info(f"2026 entry_year distribution: {ey}")
+                    if "years_exp" in roster.columns:
+                        exp = roster["years_exp"].value_counts().head(5).to_dict()
+                        logger.info(f"2026 years_exp distribution: {exp}")
             else:
                 roster_dfs[s] = None
         except Exception as e:
@@ -227,7 +198,6 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
     return seasonal_dfs, roster_dfs
 
 def _fetch_weekly_sync(seasons: Iterable[int]):
-    """Pull weekly data for DvP computation."""
     try:
         import nflreadpy as nfl
         import pandas as pd
@@ -253,7 +223,6 @@ def _fetch_weekly_sync(seasons: Iterable[int]):
     return pd.concat(frames, ignore_index=True)
 
 def _compute_dvp_from_weekly(weekly_df) -> dict:
-    """Compute Defense vs Position from weekly stats."""
     import pandas as pd
     if weekly_df is None or weekly_df.empty:
         return {}
@@ -273,7 +242,6 @@ def _compute_dvp_from_weekly(weekly_df) -> dict:
 
     df = weekly_df[weekly_df["_season"] == target_season].copy()
 
-    # Check for opponent column — nflreadpy may use different name
     opp_col = None
     for candidate in ["opponent_team", "opponent", "defteam"]:
         if candidate in df.columns:
@@ -331,7 +299,6 @@ def _compute_dvp_from_weekly(weekly_df) -> dict:
     return out
 
 def _fetch_schedule_sync(seasons: Iterable[int]):
-    """Pull real NFL schedule for given seasons."""
     try:
         import nflreadpy as nfl
         import pandas as pd
@@ -389,12 +356,12 @@ def _fetch_schedule_sync(seasons: Iterable[int]):
     return next_opp
 
 def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list[dict]:
-    """Merge seasonal stats with rosters, group by player, filter top players."""
     import pandas as pd
 
     all_player_seasons: dict[str, dict] = {}
     rookie_meta: dict[str, dict] = {}
 
+    # ── Step 1: Build seasonal stats ──
     for season, df in seasonal_dfs.items():
         if df is None or df.empty:
             continue
@@ -402,20 +369,16 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         if roster is None or roster.empty:
             continue
 
-        # Get position from roster if not in seasonal
         roster_latest = roster.drop_duplicates(subset=["player_id"], keep="last") if "player_id" in roster.columns else roster
 
-        # Merge position data
         merge_cols = ["player_id"]
         for col in ["player_name", "position", "team", "birth_date"]:
             if col in roster_latest.columns:
                 merge_cols.append(col)
 
         if "player_id" in df.columns and "player_id" in roster_latest.columns:
-            # Only merge columns not already in df
             roster_merge = roster_latest[merge_cols].copy()
             merged = df.merge(roster_merge, on="player_id", how="left", suffixes=("", "_roster"))
-            # Use roster position if df doesn't have it
             if "position" not in df.columns and "position_roster" in merged.columns:
                 merged["position"] = merged["position_roster"]
             elif "position_roster" in merged.columns:
@@ -423,7 +386,6 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         else:
             merged = df
 
-        # Filter to fantasy positions
         if "position" in merged.columns:
             merged = merged[merged["position"].isin(FANTASY_POSITIONS)]
         else:
@@ -436,6 +398,7 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             pid = row.get("player_id")
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
                 continue
+
             def _scalar(v):
                 if v is None:
                     return None
@@ -467,25 +430,17 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                 entry["team"] = normalize_team(team)
             entry["seasons"].append(_season_record(dict(row), season))
 
-    # Build rookie_meta by checking each roster season
-    # A true rookie for season S has entry_year == S-1 (drafted the prior year)
-    # AND no stats in any previous season
+    # ── Step 2: Build rookie_meta ──
     available_roster_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
     latest_roster_season = available_roster_seasons[-1] if available_roster_seasons else None
-    
-    # Get set of player_ids that have any seasonal stats
     players_with_stats = set(all_player_seasons.keys())
-    
+
     for season, roster in roster_dfs.items():
         if roster is None or roster.empty:
             continue
-    
-        import pandas as pd
-    
-        # Determine rookie mask based on available columns
+
         if "entry_year" in roster.columns:
             if season == latest_roster_season:
-                # Latest season: drafted in season-1 (e.g. 2026 roster = drafted 2025)
                 rookie_mask = roster["entry_year"] == (season - 1)
             else:
                 rookie_mask = roster["entry_year"] == season
@@ -496,30 +451,30 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             if not years_exp_col:
                 continue
             rookie_mask = roster[years_exp_col] == 0
-    
+
         if "position" in roster.columns:
             rookie_mask = rookie_mask & roster["position"].isin(FANTASY_POSITIONS)
-    
+
         rookies = roster[rookie_mask]
         logger.info(f"Season {season}: found {len(rookies)} rookies")
-    
+
         for _, row in rookies.iterrows():
             pid = row.get("player_id")
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
                 continue
-    
-            # For the latest roster season, only include players with NO prior stats
+
+            # For latest season: skip players who already have stats (veterans)
             if season == latest_roster_season and pid in players_with_stats:
                 continue
-    
+
             draft_num = row.get("draft_number") or row.get("draft_pick")
             draft_club = row.get("draft_club") or row.get("draft_team")
             college = row.get("college") or row.get("college_name")
-    
+
             new_draft_num = None if not draft_num or (isinstance(draft_num, float) and pd.isna(draft_num)) else int(draft_num)
             new_draft_club = None if not draft_club or (isinstance(draft_club, float) and pd.isna(draft_club)) else str(draft_club)
             new_college = None if not college or (isinstance(college, float) and pd.isna(college)) else str(college)
-    
+
             existing_rookie = rookie_meta.get(pid)
             if not existing_rookie or int(season) >= existing_rookie["rookie_year"]:
                 rookie_meta[pid] = {
@@ -540,49 +495,10 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                     "birth_date": row.get("birth_date"),
                     "seasons": [],
                 }
-        
-        logger.info(f"Season {season}: found {len(rookies)} rookies via rookie_year/entry_year/years_exp")
-        
-        for _, row in rookies.iterrows():
-            pid = row.get("player_id")
-            if not pid or (isinstance(pid, float) and pd.isna(pid)):
-                continue
-            draft_num = row.get("draft_number") or row.get("draft_pick")
-            draft_club = row.get("draft_club") or row.get("draft_team")
-            college = row.get("college") or row.get("college_name")
-            new_draft_num = None if not draft_num or (isinstance(draft_num, float) and pd.isna(draft_num)) else int(draft_num)
-            new_draft_club = None if not draft_club or (isinstance(draft_club, float) and pd.isna(draft_club)) else str(draft_club)
-            new_college = None if not college or (isinstance(college, float) and pd.isna(college)) else str(college)
 
-            existing_rookie = rookie_meta.get(pid)
-            # Only tag as latest rookie year if player has no prior season stats
-            # This prevents veterans from being re-tagged as rookies
-            player_has_stats = pid in all_player_seasons and len(all_player_seasons[pid].get("seasons", [])) > 0
-            if not player_has_stats:
-                if not existing_rookie or int(season) >= existing_rookie["rookie_year"]:
-                    rookie_meta[pid] = {
-                        "rookie_year": int(season),
-                        "draft_number": new_draft_num or (existing_rookie or {}).get("draft_number"),
-                        "draft_club": new_draft_club or (existing_rookie or {}).get("draft_club"),
-                        "college": new_college or (existing_rookie or {}).get("college"),
-                    }
-            if pid not in all_player_seasons:
-                name = row.get("player_name") or row.get("full_name") or ""
-                pos = row.get("position", "")
-                team = row.get("team") or row.get("current_team", "")
-                all_player_seasons[pid] = {
-                    "ext_id": pid,
-                    "name": str(name),
-                    "position": str(pos),
-                    "team": normalize_team(team) if team else "",
-                    "birth_date": row.get("birth_date"),
-                    "seasons": [],
-                }
-
-    # Latest roster overlay
-    available_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
-    if available_seasons:
-        latest_season = available_seasons[-1]
+    # ── Step 3: Latest roster overlay ──
+    if available_roster_seasons:
+        latest_season = available_roster_seasons[-1]
         latest_roster = roster_dfs[latest_season]
         if "player_id" in latest_roster.columns:
             latest_roster = latest_roster.drop_duplicates(subset=["player_id"], keep="last")
@@ -600,7 +516,7 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                     all_player_seasons[pid]["position"] = str(new_pos)
         logger.info(f"Latest-roster overlay applied from {latest_season}")
 
-    # Filter to top-N per position
+    # ── Step 4: Filter to top-N per position ──
     per_position: dict[str, list[dict]] = {}
     rookies_with_no_seasons: list[dict] = []
 
@@ -629,6 +545,7 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
     rookies_with_no_seasons.sort(key=lambda e: e.get("_rookie_score", -999), reverse=True)
     selected.extend(rookies_with_no_seasons[:200])
 
+    # ── Step 5: Build final player docs ──
     today = datetime.now(timezone.utc).date()
     final = []
     for e in selected:
@@ -637,7 +554,6 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         bd = e.get("birth_date")
         try:
             if bd is not None:
-                import pandas as pd
                 bd_dt = pd.to_datetime(bd, errors="coerce")
                 if bd_dt is not None and not pd.isna(bd_dt):
                     age = today.year - bd_dt.year - ((today.month, today.day) < (bd_dt.month, bd_dt.day))
@@ -673,7 +589,8 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
 
     return final
 
-# Cache
+
+# ── Module-level caches ──
 _NEXT_OPP_CACHE: dict[str, dict] = {}
 _DVP_LIVE: dict[str, dict] = {}
 
@@ -751,7 +668,6 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
         res = await db.outlooks.delete_many({"player_id": {"$in": traded_player_ids}})
         outlooks_invalidated = res.deleted_count or 0
 
-    # Seed DEF teams
     def_docs = []
     for code, full_name in NFL_TEAMS:
         def_docs.append({
@@ -795,7 +711,8 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
         "outlooks_invalidated": outlooks_invalidated,
     }
 
-# Static fallback DvP data (2024)
+
+# ── Static fallback DvP (2024) ──
 DEF_VS_POS_2024 = {
     "QB": {"BAL": 1, "PHI": 2, "MIN": 3, "DEN": 4, "PIT": 5, "GB": 6, "BUF": 7, "DET": 8, "NYG": 9, "SF": 10,
            "HOU": 11, "ARI": 12, "SEA": 13, "TB": 14, "LAC": 15, "KC": 16, "WAS": 17, "CHI": 18, "ATL": 19, "NE": 20,
