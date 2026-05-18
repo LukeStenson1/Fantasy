@@ -510,15 +510,18 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             new_draft_club = None if not draft_club or (isinstance(draft_club, float) and pd.isna(draft_club)) else str(draft_club)
             new_college = None if not college or (isinstance(college, float) and pd.isna(college)) else str(college)
 
-            # Only update if this is a newer rookie year than what we already have
             existing_rookie = rookie_meta.get(pid)
-            if not existing_rookie or int(season) >= existing_rookie["rookie_year"]:
-                rookie_meta[pid] = {
-                    "rookie_year": int(season),
-                    "draft_number": new_draft_num or (existing_rookie or {}).get("draft_number"),
-                    "draft_club": new_draft_club or (existing_rookie or {}).get("draft_club"),
-                    "college": new_college or (existing_rookie or {}).get("college"),
-                }
+            # Only tag as latest rookie year if player has no prior season stats
+            # This prevents veterans from being re-tagged as rookies
+            player_has_stats = pid in all_player_seasons and len(all_player_seasons[pid].get("seasons", [])) > 0
+            if not player_has_stats:
+                if not existing_rookie or int(season) >= existing_rookie["rookie_year"]:
+                    rookie_meta[pid] = {
+                        "rookie_year": int(season),
+                        "draft_number": new_draft_num or (existing_rookie or {}).get("draft_number"),
+                        "draft_club": new_draft_club or (existing_rookie or {}).get("draft_club"),
+                        "college": new_college or (existing_rookie or {}).get("college"),
+                    }
             if pid not in all_player_seasons:
                 name = row.get("player_name") or row.get("full_name") or ""
                 pos = row.get("position", "")
