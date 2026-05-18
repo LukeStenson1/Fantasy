@@ -477,19 +477,21 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         import pandas as pd
     
         if "entry_year" in roster.columns:
-            rookie_mask = roster["entry_year"] == season
+            if season == latest_roster_season:
+                # entry_year is the year drafted, which is season-1 for current rookies
+                rookie_mask = (roster["entry_year"] == season) | (roster["entry_year"] == season - 1)
+            else:
+                rookie_mask = roster["entry_year"] == season
         elif "rookie_year" in roster.columns:
             rookie_mask = roster["rookie_year"] == season
-        
-        # Tertiary: use years_exp == 0
-        elif any(col in roster.columns for col in ["years_exp", "years_experience", "experience"]):
-            years_exp_col = next(col for col in ["years_exp", "years_experience", "experience"] if col in roster.columns)
+        else:
+            years_exp_col = next((col for col in ["years_exp", "years_experience", "experience"] if col in roster.columns), None)
+            if not years_exp_col:
+                continue
             if season == latest_roster_season:
                 rookie_mask = (roster[years_exp_col] == 0) | (roster[years_exp_col].isna())
             else:
                 rookie_mask = roster[years_exp_col] == 0
-        else:
-            continue
     
         if "position" in roster.columns:
             rookie_mask = rookie_mask & roster["position"].isin(FANTASY_POSITIONS)
