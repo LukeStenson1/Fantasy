@@ -491,12 +491,19 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             draft_num = row.get("draft_number") or row.get("draft_pick")
             draft_club = row.get("draft_club") or row.get("draft_team")
             college = row.get("college") or row.get("college_name")
-            rookie_meta[pid] = {
-                "rookie_year": int(season),
-                "draft_number": None if not draft_num or (isinstance(draft_num, float) and pd.isna(draft_num)) else int(draft_num),
-                "draft_club": None if not draft_club or (isinstance(draft_club, float) and pd.isna(draft_club)) else str(draft_club),
-                "college": None if not college or (isinstance(college, float) and pd.isna(college)) else str(college),
-            }
+            new_draft_num = None if not draft_num or (isinstance(draft_num, float) and pd.isna(draft_num)) else int(draft_num)
+            new_draft_club = None if not draft_club or (isinstance(draft_club, float) and pd.isna(draft_club)) else str(draft_club)
+            new_college = None if not college or (isinstance(college, float) and pd.isna(college)) else str(college)
+
+            # Only update if this is a newer rookie year than what we already have
+            existing_rookie = rookie_meta.get(pid)
+            if not existing_rookie or int(season) >= existing_rookie["rookie_year"]:
+                rookie_meta[pid] = {
+                    "rookie_year": int(season),
+                    "draft_number": new_draft_num or (existing_rookie or {}).get("draft_number"),
+                    "draft_club": new_draft_club or (existing_rookie or {}).get("draft_club"),
+                    "college": new_college or (existing_rookie or {}).get("college"),
+                }
             if pid not in all_player_seasons:
                 name = row.get("player_name") or row.get("full_name") or ""
                 pos = row.get("position", "")
