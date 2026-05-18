@@ -467,8 +467,14 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                 entry["team"] = normalize_team(team)
             entry["seasons"].append(_season_record(dict(row), season))
 
+    # Build rookie_meta by checking each roster season
+    # A true rookie for season S has entry_year == S-1 (drafted the prior year)
+    # AND no stats in any previous season
     available_roster_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
     latest_roster_season = available_roster_seasons[-1] if available_roster_seasons else None
+    
+    # Get set of player_ids that have any seasonal stats
+    players_with_stats = set(all_player_seasons.keys())
     
     for season, roster in roster_dfs.items():
         if roster is None or roster.empty:
@@ -476,27 +482,65 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
     
         import pandas as pd
     
+        # Determine rookie mask based on available columns
         if "entry_year" in roster.columns:
             if season == latest_roster_season:
-                # entry_year is the year drafted, which is season-1 for current rookies
-                rookie_mask = (roster["entry_year"] == season) | (roster["entry_year"] == season - 1)
+                # Latest season: drafted in season-1 (e.g. 2026 roster = drafted 2025)
+                rookie_mask = roster["entry_year"] == (season - 1)
             else:
                 rookie_mask = roster["entry_year"] == season
         elif "rookie_year" in roster.columns:
             rookie_mask = roster["rookie_year"] == season
         else:
-            years_exp_col = next((col for col in ["years_exp", "years_experience", "experience"] if col in roster.columns), None)
+            years_exp_col = next((c for c in ["years_exp", "years_experience", "experience"] if c in roster.columns), None)
             if not years_exp_col:
                 continue
-            if season == latest_roster_season:
-                rookie_mask = (roster[years_exp_col] == 0) | (roster[years_exp_col].isna())
-            else:
-                rookie_mask = roster[years_exp_col] == 0
+            rookie_mask = roster[years_exp_col] == 0
     
         if "position" in roster.columns:
             rookie_mask = rookie_mask & roster["position"].isin(FANTASY_POSITIONS)
-
+    
         rookies = roster[rookie_mask]
+        logger.info(f"Season {season}: found {len(rookies)} rookies")
+    
+        for _, row in rookies.iterrows():
+            pid = row.get("player_id")
+            if not pid or (isinstance(pid, float) and pd.isna(pid)):
+                continue
+    
+            # For the latest roster season, only include players with NO prior stats
+            if season == latest_roster_season and pid in players_with_stats:
+                continue
+    
+            draft_num = row.get("draft_number") or row.get("draft_pick")
+            draft_club = row.get("draft_club") or row.get("draft_team")
+            college = row.get("college") or row.get("college_name")
+    
+            new_draft_num = None if not draft_num or (isinstance(draft_num, float) and pd.isna(draft_num)) else int(draft_num)
+            new_draft_club = None if not draft_club or (isinstance(draft_club, float) and pd.isna(draft_club)) else str(draft_club)
+            new_college = None if not college or (isinstance(college, float) and pd.isna(college)) else str(college)
+    
+            existing_rookie = rookie_meta.get(pid)
+            if not existing_rookie or int(season) >= existing_rookie["rookie_year"]:
+                rookie_meta[pid] = {
+                    "rookie_year": int(season),
+                    "draft_number": new_draft_num or (existing_rookie or {}).get("draft_number"),
+                    "draft_club": new_draft_club or (existing_rookie or {}).get("draft_club"),
+                    "college": new_college or (existing_rookie or {}).get("college"),
+                }
+            if pid not in all_player_seasons:
+                name = row.get("player_name") or row.get("full_name") or ""
+                pos = row.get("position", "")
+                team = row.get("team") or row.get("current_team", "")
+                all_player_seasons[pid] = {
+                    "ext_id": pid,
+                    "name": str(name),
+                    "position": str(pos),
+                    "team": normalize_team(team) if team else "",
+                    "birth_date": row.get("birth_date"),
+                    "seasons": [],
+                }
+        
         logger.info(f"Season {season}: found {len(rookies)} rookies via rookie_year/entry_year/years_exp")
         
         for _, row in rookies.iterrows():
