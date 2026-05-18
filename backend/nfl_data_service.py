@@ -206,6 +206,18 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
                     roster = roster.rename(columns=rename_map)
                 roster_dfs[s] = roster
                 logger.info(f"Fetched {s} rosters: {len(roster)} players")
+                if s == 2026 and roster is not None and not roster.empty:
+                    cols = list(roster.columns)
+                    logger.info(f"2026 roster columns: {cols}")
+                    if "years_exp" in roster.columns:
+                        exp_counts = roster["years_exp"].value_counts().head(10).to_dict()
+                        logger.info(f"2026 years_exp distribution: {exp_counts}")
+                    if "draft_year" in roster.columns:
+                        dy_counts = roster["draft_year"].value_counts().head(5).to_dict()
+                        logger.info(f"2026 draft_year distribution: {dy_counts}")
+                    if "entry_year" in roster.columns:
+                        ey_counts = roster["entry_year"].value_counts().head(5).to_dict()
+                        logger.info(f"2026 entry_year distribution: {ey_counts}")
             else:
                 roster_dfs[s] = None
         except Exception as e:
