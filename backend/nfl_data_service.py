@@ -578,7 +578,7 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
         selected.extend(lst[:cap])
 
     rookies_with_no_seasons.sort(key=lambda e: e.get("_rookie_score", -999), reverse=True)
-    selected.extend(rookies_with_no_seasons[:60])
+    selected.extend(rookies_with_no_seasons[:200])
 
     today = datetime.now(timezone.utc).date()
     final = []
