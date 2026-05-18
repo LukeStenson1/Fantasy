@@ -476,12 +476,11 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
     
         import pandas as pd
     
-        # Primary: use rookie_year column if available (most reliable)
-        if "rookie_year" in roster.columns:
-            rookie_mask = roster["rookie_year"] == season
-        # Secondary: use entry_year column
-        elif "entry_year" in roster.columns:
+        if "entry_year" in roster.columns:
             rookie_mask = roster["entry_year"] == season
+        elif "rookie_year" in roster.columns:
+            rookie_mask = roster["rookie_year"] == season
+        
         # Tertiary: use years_exp == 0
         elif any(col in roster.columns for col in ["years_exp", "years_experience", "experience"]):
             years_exp_col = next(col for col in ["years_exp", "years_experience", "experience"] if col in roster.columns)
