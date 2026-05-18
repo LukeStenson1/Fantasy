@@ -455,22 +455,35 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
                 entry["team"] = normalize_team(team)
             entry["seasons"].append(_season_record(dict(row), season))
 
-    # Rookies from rosters
+    available_roster_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
+    latest_roster_season = available_roster_seasons[-1] if available_roster_seasons else None
+
     for season, roster in roster_dfs.items():
         if roster is None or roster.empty:
             continue
+
         years_exp_col = None
         for col in ["years_exp", "years_experience", "experience"]:
             if col in roster.columns:
                 years_exp_col = col
                 break
-        if not years_exp_col:
-            continue
 
-        rookies = roster[
-            (roster[years_exp_col] == 0) &
-            (roster["position"].isin(FANTASY_POSITIONS) if "position" in roster.columns else True)
-        ]
+        if years_exp_col:
+            if season == latest_roster_season:
+                # For latest season, include years_exp=0 OR null (newly drafted players)
+                rookie_mask = (roster[years_exp_col] == 0) | (roster[years_exp_col].isna())
+            else:
+                rookie_mask = roster[years_exp_col] == 0
+        else:
+            if season == latest_roster_season:
+                rookie_mask = pd.Series([True] * len(roster), index=roster.index)
+            else:
+                continue
+
+        if "position" in roster.columns:
+            rookie_mask = rookie_mask & roster["position"].isin(FANTASY_POSITIONS)
+
+        rookies = roster[rookie_mask]
         for _, row in rookies.iterrows():
             pid = row.get("player_id")
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
