@@ -460,10 +460,6 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
                 continue
 
-            # For latest season: skip players who already have stats (veterans)
-            if season == latest_roster_season and pid in players_with_stats:
-                continue
-
             draft_num = row.get("draft_number") or row.get("draft_pick")
             draft_club = row.get("draft_club") or row.get("draft_team")
             college = row.get("college") or row.get("college_name")
