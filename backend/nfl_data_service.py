@@ -515,25 +515,19 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
 
     for entry in all_player_seasons.values():
         pos = entry["position"]
-        rm = rookie_meta.get(entry["ext_id"])
         if not entry["seasons"]:
             if entry["position"] == "K":
                 entry["_latest_fpts"] = 0
                 per_position.setdefault("K", []).append(entry)
                 continue
-            if rm:
-                entry["_rookie_score"] = -1 * (rm.get("draft_number") or 999)
+            r = rookie_meta.get(entry["ext_id"])
+            if r:
+                entry["_rookie_score"] = -1 * (r.get("draft_number") or 999)
                 rookies_with_no_seasons.append(entry)
             continue
-        # If player has rookie_info and their only stats are from their rookie year,
-        # add them to rookies list too so they show on Draft Board
-        if rm and len(entry["seasons"]) == 1 and entry["seasons"][0].get("season") == rm.get("rookie_year"):
-            entry["_rookie_score"] = -1 * (rm.get("draft_number") or 999)
-            rookies_with_no_seasons.append(entry)
-            continue
-    best = max((s.get("fpts_half_ppr", 0) for s in entry["seasons"]), default=0)
-    entry["_latest_fpts"] = best
-    per_position.setdefault(pos, []).append(entry)
+        best = max((s.get("fpts_half_ppr", 0) for s in entry["seasons"]), default=0)
+        entry["_latest_fpts"] = best
+        per_position.setdefault(pos, []).append(entry)
 
     selected: list[dict] = []
     for pos, lst in per_position.items():
