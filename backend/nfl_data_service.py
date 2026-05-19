@@ -440,10 +440,7 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             continue
 
         if "entry_year" in roster.columns:
-            if season == latest_roster_season:
-                rookie_mask = roster["entry_year"] == (season - 1)
-            else:
-                rookie_mask = roster["entry_year"] == season
+            rookie_mask = roster["entry_year"] == season
         elif "rookie_year" in roster.columns:
             rookie_mask = roster["rookie_year"] == season
         else:
