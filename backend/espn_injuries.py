@@ -97,10 +97,17 @@ def _fetch_news_sync() -> list[dict]:
             teams = []
             for cat in (a.get("categories") or []):
                 if cat.get("type") == "team":
-                    abv = cat.get("abbreviation", "")
-                    code = ESPN_ABV_TO_CODE.get(abv.upper())
+                    # Try description (full team name) first
+                    desc = cat.get("description", "")
+                    code = ESPN_TO_CODE.get(desc)
                     if code:
                         teams.append(code)
+                    else:
+                        # Try abbreviation as fallback
+                        abv = cat.get("abbreviation", "")
+                        code = ESPN_ABV_TO_CODE.get(abv.upper())
+                        if code:
+                            teams.append(code)
                 # Also check athlete references
                 if cat.get("type") == "athlete":
                     pass  # athlete name in description
