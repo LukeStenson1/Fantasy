@@ -4,7 +4,7 @@ import { PositionBadge, TagBadge, InjuryBadge, MatchupBadge } from "./Badges";
 import { api } from "../lib/api";
 import { Button } from "./ui/button";
 
-const COLUMNS = [
+const COLUMNS_SKILL = [
   { key: "name", label: "Player", sortable: true },
   { key: "position", label: "Pos", sortable: true },
   { key: "team", label: "Tm", sortable: true },
@@ -21,8 +21,36 @@ const COLUMNS = [
   { key: "current_fpts_per_game", label: "FPts/G", sortable: true, type: "num", emphasize: true },
 ];
 
+const COLUMNS_K = [
+  { key: "name", label: "Player", sortable: true },
+  { key: "position", label: "Pos", sortable: true },
+  { key: "team", label: "Tm", sortable: true },
+  { key: "season", label: "Yr", sortable: true, fromCurrent: true, type: "num" },
+  { key: "games", label: "G", sortable: true, fromCurrent: true, type: "num" },
+  { key: "current_fpts", label: "FPts", sortable: true, type: "num", emphasize: true },
+  { key: "current_fpts_per_game", label: "FPts/G", sortable: true, type: "num", emphasize: true },
+];
+
+const COLUMNS_DEF = [
+  { key: "name", label: "Team D/ST", sortable: true },
+  { key: "position", label: "Pos", sortable: true },
+  { key: "team", label: "Tm", sortable: true },
+  { key: "next_opponent", label: "Next Opp", sortable: false },
+  { key: "matchup_score", label: "Matchup", sortable: false },
+];
+
+function getColumns(rows) {
+  if (!rows || rows.length === 0) return COLUMNS_SKILL;
+  const positions = new Set(rows.map((r) => r.position));
+  if (positions.has("DEF")) return COLUMNS_DEF;
+  if (positions.has("K") && positions.size === 1) return COLUMNS_K;
+  return COLUMNS_SKILL;
+}
+
 function getValue(p, col) {
   if (col.key === "current_fpts" || col.key === "current_fpts_per_game") return p[col.key];
+  if (col.key === "next_opponent") return p.next_opponent || "—";
+  if (col.key === "matchup_score") return p.matchup_score;
   if (col.fromCurrent) return p.current_season?.[col.key];
   return p[col.key];
 }
@@ -32,10 +60,12 @@ export default function StatsTable({ rows, scoring }) {
   const [dir, setDir] = useState("desc");
   const [expandedId, setExpandedId] = useState(null);
 
+  const columns = useMemo(() => getColumns(rows), [rows]);
+
   const sorted = useMemo(() => {
     const arr = [...rows];
     arr.sort((a, b) => {
-      const col = COLUMNS.find((c) => c.key === sortKey) || COLUMNS[0];
+      const col = columns.find((c) => c.key === sortKey) || columns[0];
       const av = getValue(a, col);
       const bv = getValue(b, col);
       if (av == null && bv == null) return 0;
@@ -48,7 +78,7 @@ export default function StatsTable({ rows, scoring }) {
         : String(bv).localeCompare(String(av));
     });
     return arr;
-  }, [rows, sortKey, dir]);
+  }, [rows, sortKey, dir, columns]);
 
   const onSort = (key) => {
     if (sortKey === key) setDir(dir === "asc" ? "desc" : "asc");
@@ -66,7 +96,7 @@ export default function StatsTable({ rows, scoring }) {
         <thead>
           <tr>
             <th style={{width: 28}}></th>
-            {COLUMNS.map((c) => (
+            {columns.map((c) => (
               <th key={c.key} onClick={() => c.sortable && onSort(c.key)}
                 className={`text-left whitespace-nowrap ${c.emphasize ? "text-emerald-300" : ""}`}
                 data-testid={`col-header-${c.key}`}>
@@ -77,7 +107,7 @@ export default function StatsTable({ rows, scoring }) {
         </thead>
         <tbody>
           {sorted.length === 0 && (
-            <tr><td colSpan={COLUMNS.length + 1} className="text-center py-8 text-slate-500">No players match these filters.</td></tr>
+            <tr><td colSpan={columns.length + 1} className="text-center py-8 text-slate-500">No players match these filters.</td></tr>
           )}
           {sorted.map((p) => (
             <PlayerRow
@@ -86,6 +116,7 @@ export default function StatsTable({ rows, scoring }) {
               expanded={expandedId === p.id}
               onToggle={() => setExpandedId(expandedId === p.id ? null : p.id)}
               scoring={scoring}
+              columns={columns}
             />
           ))}
         </tbody>
@@ -94,7 +125,7 @@ export default function StatsTable({ rows, scoring }) {
   );
 }
 
-function PlayerRow({ player, expanded, onToggle, scoring }) {
+function PlayerRow({ player, expanded, onToggle, scoring, columns }) {
   const p = player;
   return (
     <>
@@ -111,11 +142,20 @@ function PlayerRow({ player, expanded, onToggle, scoring }) {
         </td>
         <td><PositionBadge position={p.position} /></td>
         <td className="font-mono-tab text-slate-400">{p.team}</td>
-        {COLUMNS.slice(3).map((c) => {
+        {columns.slice(3).map((c) => {
           const v = getValue(p, c);
-          const formatted = v == null ? "—" :
-            c.key === "season" ? String(v) :
-            typeof v === "number" ? v.toLocaleString() : v;
+          let formatted;
+          if (c.key === "matchup_score") {
+            if (v == null) formatted = "—";
+            else {
+              const color = v >= 1 ? "text-emerald-400" : v <= -1 ? "text-red-400" : "text-slate-300";
+              formatted = <span className={`font-mono-tab font-bold ${color}`}>{v > 0 ? `+${v}` : v}</span>;
+            }
+          } else {
+            formatted = v == null ? "—" :
+              c.key === "season" ? String(v) :
+              typeof v === "number" ? v.toLocaleString() : v;
+          }
           return (
             <td key={c.key} className={`font-mono-tab ${c.emphasize ? "font-bold text-emerald-300" : "text-slate-300"}`}>
               {formatted}
@@ -125,7 +165,7 @@ function PlayerRow({ player, expanded, onToggle, scoring }) {
       </tr>
       {expanded && (
         <tr className="expand-row" data-testid={`expand-row-${p.id}`}>
-          <td colSpan={COLUMNS.length + 1} className="bg-slate-900/40 border-t border-emerald-500/20 p-0">
+          <td colSpan={columns.length + 1} className="bg-slate-900/40 border-t border-emerald-500/20 p-0">
             <ExpandedContent player={p} scoring={scoring} />
           </td>
         </tr>
@@ -158,20 +198,21 @@ function ExpandedContent({ player, scoring }) {
 
   if (!full) return <div className="p-6 text-slate-500 text-sm">Loading…</div>;
   const seasons = full.seasons || [];
+  const isDef = full.position === "DEF";
+  const isK = full.position === "K";
 
   return (
     <div className="p-6 space-y-6">
-      {/* header strip */}
       <div className="flex flex-wrap items-center gap-4">
         <div>
           <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Player</div>
           <div className="font-display text-2xl font-bold text-white">{full.name}</div>
         </div>
         <div className="flex flex-wrap gap-3 ml-auto">
-          <Stat label="Age" value={full.age ?? "—"} />
-          <Stat label="Yrs" value={full.experience ?? "—"} />
+          {!isDef && !isK && <Stat label="Age" value={full.age ?? "—"} />}
+          {!isDef && !isK && <Stat label="Yrs" value={full.experience ?? "—"} />}
           {full.next_opponent && <Stat label="Next Opp" value={full.next_opponent} />}
-          {full.matchup_def_rank && (
+          {full.matchup_def_rank && !isDef && (
             <div className="border border-slate-800 rounded-md px-3 py-2 bg-slate-950/40">
               <div className="text-[9px] font-bold tracking-[0.2em] uppercase text-slate-500">vs {full.position} D</div>
               <div className="flex items-center gap-2 mt-0.5">
@@ -191,40 +232,54 @@ function ExpandedContent({ player, scoring }) {
         </div>
       </div>
 
-      {/* Career stats mini table */}
-      <div>
-        <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500 mb-2">Career Production</div>
-        <div className="overflow-auto border border-slate-800 rounded-md bg-slate-950/40">
-          <table className="pfr-table w-full" data-testid={`career-table-${player.id}`}>
-            <thead><tr>
-              <th>Season</th><th>G</th><th>Pass Yd</th><th>Pass TD</th><th>INT</th>
-              <th>Rush Yd</th><th>Rush TD</th><th>Rec</th><th>Tgt</th><th>Rec Yd</th><th>Rec TD</th>
-              <th className="text-emerald-300">FPts</th><th className="text-emerald-300">FPts/G</th>
-            </tr></thead>
-            <tbody>
-              {seasons.map((s) => (
-                <tr key={s.season}>
-                  <td className="font-bold text-white">{s.season}</td>
-                  <td className="font-mono-tab">{s.games}</td>
-                  <td className="font-mono-tab">{s.pass_yds?.toLocaleString() || "—"}</td>
-                  <td className="font-mono-tab">{s.pass_td || "—"}</td>
-                  <td className="font-mono-tab">{s.pass_int || "—"}</td>
-                  <td className="font-mono-tab">{s.rush_yds?.toLocaleString() || "—"}</td>
-                  <td className="font-mono-tab">{s.rush_td || "—"}</td>
-                  <td className="font-mono-tab">{s.receptions || "—"}</td>
-                  <td className="font-mono-tab">{s.targets || "—"}</td>
-                  <td className="font-mono-tab">{s.rec_yds?.toLocaleString() || "—"}</td>
-                  <td className="font-mono-tab">{s.rec_td || "—"}</td>
-                  <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_${scoring}`]}</td>
-                  <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_per_game_${scoring}`]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Career stats — position-appropriate */}
+      {!isDef && seasons.length > 0 && (
+        <div>
+          <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500 mb-2">Career Production</div>
+          <div className="overflow-auto border border-slate-800 rounded-md bg-slate-950/40">
+            <table className="pfr-table w-full" data-testid={`career-table-${player.id}`}>
+              <thead><tr>
+                <th>Season</th><th>G</th>
+                {!isK && <><th>Pass Yd</th><th>Pass TD</th><th>INT</th><th>Rush Yd</th><th>Rush TD</th><th>Rec</th><th>Tgt</th><th>Rec Yd</th><th>Rec TD</th></>}
+                <th className="text-emerald-300">FPts</th><th className="text-emerald-300">FPts/G</th>
+              </tr></thead>
+              <tbody>
+                {seasons.map((s) => (
+                  <tr key={s.season}>
+                    <td className="font-bold text-white">{s.season}</td>
+                    <td className="font-mono-tab">{s.games}</td>
+                    {!isK && <>
+                      <td className="font-mono-tab">{s.pass_yds?.toLocaleString() || "—"}</td>
+                      <td className="font-mono-tab">{s.pass_td || "—"}</td>
+                      <td className="font-mono-tab">{s.pass_int || "—"}</td>
+                      <td className="font-mono-tab">{s.rush_yds?.toLocaleString() || "—"}</td>
+                      <td className="font-mono-tab">{s.rush_td || "—"}</td>
+                      <td className="font-mono-tab">{s.receptions || "—"}</td>
+                      <td className="font-mono-tab">{s.targets || "—"}</td>
+                      <td className="font-mono-tab">{s.rec_yds?.toLocaleString() || "—"}</td>
+                      <td className="font-mono-tab">{s.rec_td || "—"}</td>
+                    </>}
+                    <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_${scoring}`]}</td>
+                    <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_per_game_${scoring}`]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* AI Outlook + News side by side */}
+      {isDef && (
+        <div className="bg-slate-950/40 border border-slate-800 rounded-md p-4">
+          <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500 mb-2">Defense Info</div>
+          <p className="text-sm text-slate-400">
+            D/ST units are scored using opponent offensive profile. Check the matchup score above for this week's outlook.
+            Use the Lineup tool to get a full Lab Score for your D/ST.
+          </p>
+        </div>
+      )}
+
+      {/* AI Outlook + News */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-slate-950/40 border border-slate-800 rounded-md" data-testid={`outlook-${player.id}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
@@ -259,13 +314,9 @@ function ExpandedContent({ player, scoring }) {
             <Newspaper className="w-4 h-4 text-slate-400" />
             <h3 className="font-display font-bold text-white">Team News & Insights</h3>
             {full.news_search_url && (
-              <a
-                href={full.news_search_url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <a href={full.news_search_url} target="_blank" rel="noopener noreferrer"
                 className="ml-auto text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-                data-testid={`news-search-link-${player.id}`}
-              >
+                data-testid={`news-search-link-${player.id}`}>
                 Latest news <ExternalLink className="w-3 h-3" />
               </a>
             )}
