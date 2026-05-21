@@ -86,6 +86,11 @@ def _fetch_news_sync() -> list[dict]:
         articles = payload.get("articles", []) or []
         # Filter to only dict articles
         articles = [a for a in articles if isinstance(a, dict)]
+        # Debug: log first article structure
+        if articles:
+            first = articles[0]
+            logger.info(f"ESPN article sample keys: {list(first.keys())}")
+            logger.info(f"ESPN article categories sample: {first.get('categories', [])[:3]}")
         news_items = []
         for a in articles:
             # Extract team references from categories
