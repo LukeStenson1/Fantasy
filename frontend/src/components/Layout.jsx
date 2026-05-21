@@ -61,14 +61,14 @@ export default function Layout({ children }) {
 
       {/* Top leaderboard ad */}
       <div className="w-full flex justify-center py-2 bg-slate-900/50 border-b border-slate-800/50">
-        <AdUnit slot="YOUR_TOP_AD_SLOT" format="horizontal" className="w-full max-w-4xl" />
+        <AdUnit slot="7472733276" format="horizontal" className="w-full max-w-4xl" />
       </div>
 
       {/* Main content with sidebar ads */}
       <div className="flex flex-1 max-w-7xl mx-auto w-full px-4 py-6 gap-6">
         {/* Left sidebar ad — hidden on mobile */}
         <aside className="hidden xl:flex flex-col gap-4 w-40 shrink-0 pt-2">
-          <AdUnit slot="YOUR_LEFT_AD_SLOT" format="vertical" className="w-40" />
+          <AdUnit slot="8063760212" format="vertical" className="w-40" />
         </aside>
 
         {/* Page content */}
@@ -78,13 +78,13 @@ export default function Layout({ children }) {
 
         {/* Right sidebar ad — hidden on mobile */}
         <aside className="hidden xl:flex flex-col gap-4 w-40 shrink-0 pt-2">
-          <AdUnit slot="YOUR_RIGHT_AD_SLOT" format="vertical" className="w-40" />
+          <AdUnit slot="4226559777" format="vertical" className="w-40" />
         </aside>
       </div>
 
       {/* Bottom leaderboard ad */}
       <div className="w-full flex justify-center py-4 bg-slate-900/50 border-t border-slate-800/50">
-        <AdUnit slot="YOUR_BOTTOM_AD_SLOT" format="horizontal" className="w-full max-w-4xl" />
+        <AdUnit slot="6881020577" format="horizontal" className="w-full max-w-4xl" />
       </div>
 
       {/* Footer */}
