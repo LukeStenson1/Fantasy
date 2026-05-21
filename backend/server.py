@@ -884,6 +884,45 @@ async def matchups_this_week():
         sub_soft = sorted(sub, key=lambda r: r["rank"] or 0, reverse=True)[:5]
         sub_tough = sorted(sub, key=lambda r: r["rank"] or 99)[:5]
         by_pos[pos] = {"soft": sub_soft, "tough": sub_tough}
+
+    # DEF matchups — best defenses face weakest offenses
+    # Use average offensive rank (how many pts the offense scores vs defenses)
+    # Proxy: teams facing the toughest defenses (rank 1-5) = hardest matchup for DEF
+    # Teams facing the softest defenses (rank 28-32) = easiest matchup for DEF
+    def_rows = []
+    for t in teams:
+        if not t or len(t) > 4:
+            continue
+        info = get_next_opponent(t)
+        if not info or not info.get("opponent"):
+            continue
+        opp = info["opponent"]
+        # Average DvP rank across all positions as proxy for offensive strength
+        pos_ranks = []
+        for pos in ("QB", "RB", "WR", "TE"):
+            cell = data.get(pos, {}).get(t)
+            if cell and cell.get("rank"):
+                pos_ranks.append(cell["rank"])
+        if not pos_ranks:
+            continue
+        avg_rank = sum(pos_ranks) / len(pos_ranks)
+        # High avg_rank = soft defense = good for offense = bad for DEF streaming
+        # Low avg_rank = tough defense = bad for offense = good for DEF streaming
+        def_rows.append({
+            "offense_team": t,
+            "opp_team": opp,
+            "position": "DEF",
+            "rank": round(avg_rank, 1),
+            "fpts_allowed_per_game": None,
+            "season": next((data.get(pos, {}).get(t, {}).get("season") for pos in ("QB", "RB", "WR", "TE") if data.get(pos, {}).get(t)), None),
+        })
+
+    # For DEF: "soft" means facing a weak offense (low avg rank = tough D = good for streaming)
+    # "tough" means facing a strong offense
+    def_soft = sorted(def_rows, key=lambda r: r["rank"] or 16)[:5]   # face weakest offenses
+    def_tough = sorted(def_rows, key=lambda r: r["rank"] or 16, reverse=True)[:5]  # face strongest offenses
+    by_pos["DEF"] = {"soft": def_soft, "tough": def_tough}
+
     return {"week": week, "source": dvp.get("source"), "by_position": by_pos}
 
 
