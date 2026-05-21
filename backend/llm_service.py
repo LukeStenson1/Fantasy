@@ -83,7 +83,7 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
     try:
         client = _get_client(api_key)
         response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash-preview-04-17",
+            model="gemini-2.5-flash",
             contents=prompt,
         )
         return response.text.strip()
@@ -128,7 +128,7 @@ async def generate_trade_verdict(*, side_a_label: str, side_b_label: str, side_a
     try:
         client = _get_client(api_key)
         response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash-preview-04-17",
+            model="gemini-2.5-flash",
             contents=prompt,
         )
         return response.text.strip()
