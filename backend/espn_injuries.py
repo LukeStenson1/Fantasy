@@ -105,13 +105,13 @@ def _fetch_news_sync() -> list[dict]:
             description = a.get("description") or ""
             published = a.get("published") or a.get("lastModified") or ""
             url = ""
-            for link in (a.get("links") or {}).get("web", []) if isinstance((a.get("links") or {}), dict) else []:
-                url = link.get("href", "")
-                break
-            if not url:
-                mobile = (a.get("links") or {})
-                if isinstance(mobile, dict):
-                    url = mobile.get("web", {}).get("href", "") if isinstance(mobile.get("web"), dict) else ""
+            links = a.get("links") or {}
+            if isinstance(links, dict):
+                web = links.get("web")
+                if isinstance(web, dict):
+                    url = web.get("href", "")
+                elif isinstance(web, list) and web:
+                    url = web[0].get("href", "") if isinstance(web[0], dict) else ""
 
             news_items.append({
                 "headline": headline,
