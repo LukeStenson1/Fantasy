@@ -140,9 +140,21 @@ def _fetch_news_sync() -> list[dict]:
         return []
 
 
+FANTASY_KEYWORDS = [
+    "fantasy", "targets", "touches", "snap", "snaps", "carries", "role",
+    "depth chart", "starter", "backup", "injury", "return", "practice",
+    "week", "activate", "waiver", "start", "sit", "add", "drop", "trade",
+    "points", "production", "workload", "usage", "contract", "signs", "cut",
+]
+
+def _fantasy_score(article: dict) -> int:
+    """Score article by fantasy relevance — higher = more relevant."""
+    text = (article.get("headline", "") + " " + article.get("snippet", "")).lower()
+    return sum(1 for kw in FANTASY_KEYWORDS if kw in text)
+
 async def refresh_news(db, news_items: list[dict]) -> int:
     """Match news articles to players by team and update their news field.
-    Each player gets up to 6 most recent articles from their team."""
+    Prioritizes fantasy-relevant articles. Invalidates cached outlooks when news changes."""
     if not news_items:
         return 0
 
@@ -152,21 +164,42 @@ async def refresh_news(db, news_items: list[dict]) -> int:
         for team in item.get("teams", []):
             team_news.setdefault(team, []).append(item)
 
-    # Keep only 6 per team, sorted by date desc
+    # Sort by fantasy relevance first, then date — keep top 6
     for team in team_news:
         team_news[team] = sorted(
             team_news[team],
-            key=lambda x: x.get("date", ""),
+            key=lambda x: (_fantasy_score(x), x.get("date", "")),
             reverse=True
         )[:6]
 
     updated = 0
+    invalidated_outlook_ids = []
+
     for team, articles in team_news.items():
-        result = await db.players.update_many(
+        # Find players on this team
+        players = await db.players.find(
             {"team": team, "position": {"$in": ["QB", "RB", "WR", "TE", "K"]}},
-            {"$set": {"news": articles}}
-        )
-        updated += result.modified_count
+            {"_id": 0, "id": 1, "news": 1}
+        ).to_list(length=50)
+
+        for player in players:
+            old_news = player.get("news") or []
+            old_headlines = {n.get("headline") for n in old_news}
+            new_headlines = {a.get("headline") for a in articles}
+
+            # News changed — update player and invalidate cached outlook
+            if old_headlines != new_headlines:
+                await db.players.update_one(
+                    {"id": player["id"]},
+                    {"$set": {"news": articles}}
+                )
+                invalidated_outlook_ids.append(player["id"])
+                updated += 1
+
+    # Invalidate cached outlooks for players with new news
+    if invalidated_outlook_ids:
+        res = await db.outlooks.delete_many({"player_id": {"$in": invalidated_outlook_ids}})
+        logger.info(f"News refresh: invalidated {res.deleted_count} cached outlooks due to new news")
 
     logger.info(f"News refresh: updated {updated} players across {len(team_news)} teams")
     return updated
