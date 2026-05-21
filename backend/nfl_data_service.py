@@ -460,10 +460,6 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list
             if not pid or (isinstance(pid, float) and pd.isna(pid)):
                 continue
 
-            # Skip players who already have stats — they're no longer true rookies
-            if pid in players_with_stats:
-                continue
-
             draft_num = row.get("draft_number") or row.get("draft_pick")
             draft_club = row.get("draft_club") or row.get("draft_team")
             college = row.get("college") or row.get("college_name")
