@@ -694,7 +694,15 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
             {"key": "next_opp", "value": next_opp, "updated_at": datetime.now(timezone.utc).isoformat()},
             upsert=True,
         )
-
+    # Refresh ESPN news
+    try:
+        from .espn_injuries import refresh_news, _fetch_news_sync
+        news_items = await loop.run_in_executor(None, _fetch_news_sync)
+        news_updated = await refresh_news(db, news_items)
+        logger.info(f"News refresh complete: {news_updated} players updated")
+    except Exception as e:
+        logger.warning(f"News refresh failed: {e}")
+        
     return {
         "status": "ok",
         "players": len(merged),
