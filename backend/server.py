@@ -796,11 +796,12 @@ async def list_rookies(scoring: Literal["standard", "half_ppr", "ppr"] = "half_p
     if not items:
         return {"count": 0, "items": []}
 
-    # Determine the latest rookie class year, return only those rookies
+    # Only show players with zero career stats — true incoming rookies
+    items = [p for p in items if not p.get("seasons") or len(p.get("seasons", [])) == 0]
+    if not items:
+        return {"count": 0, "rookie_year": None, "items": []}
     max_year = max((p.get("rookie_info", {}).get("rookie_year", 0) for p in items), default=0)
     items = [p for p in items if (p.get("rookie_info") or {}).get("rookie_year") == max_year]
-    # Only show players with NO prior season stats (true first-year players)
-    items = [p for p in items if not p.get("seasons") or len(p.get("seasons", [])) == 0]
     items = [_attach_current_season(p, None, scoring) for p in items]
 
     items.sort(key=lambda p: (p.get("rookie_info") or {}).get("draft_number") or 999)
