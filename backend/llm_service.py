@@ -54,8 +54,19 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
         )
     else:
         last_season = (player.get("seasons") or [{}])[-1]
+        # Sort news by fantasy relevance for the prompt
+        fantasy_keywords = [
+            "fantasy", "targets", "touches", "snap", "carries", "role",
+            "starter", "backup", "injury", "return", "workload", "usage",
+        ]
+        def _news_score(n):
+            text = (n.get("headline", "") + " " + n.get("snippet", "")).lower()
+            return sum(1 for kw in fantasy_keywords if kw in text)
+
+        sorted_news = sorted(news_items, key=_news_score, reverse=True)
         news_summary = "\n".join(
-            f"- ({n.get('date','')}) {n.get('headline','')}: {n.get('snippet','')}" for n in news_items[:6]
+            f"- ({n.get('date','')}) {n.get('headline','')}: {n.get('snippet','')}"
+            for n in sorted_news[:6]
         ) or "No recent news on record."
 
         inj_status = player.get("injury_status")
