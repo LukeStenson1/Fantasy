@@ -1,5 +1,4 @@
 /* App-level styles deliberately minimal — Tailwind handles layout. */
 .App {
     min-height: 100vh;
-    background: #ffffff;
 }
