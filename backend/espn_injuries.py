@@ -80,7 +80,12 @@ def _fetch_news_sync() -> list[dict]:
     """Fetch latest NFL news from ESPN. Returns list of article dicts."""
     try:
         payload = _fetch_url_sync(ESPN_NEWS_URL)
+        if not isinstance(payload, dict):
+            logger.warning(f"ESPN news unexpected response type: {type(payload)}")
+            return []
         articles = payload.get("articles", []) or []
+        # Filter to only dict articles
+        articles = [a for a in articles if isinstance(a, dict)]
         news_items = []
         for a in articles:
             # Extract team references from categories
