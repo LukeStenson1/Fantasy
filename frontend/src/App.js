@@ -1,3 +1,17 @@
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
+import { AuthProvider } from "./contexts/AuthContext";
+import Home from "./pages/Home";
+import Lineup from "./pages/Lineup";
+import Trades from "./pages/Trades";
+import DraftBoard from "./pages/DraftBoard";
+import Stats from "./pages/Stats";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import MyRankings from "./pages/MyRankings";
+import "./App.css";
+
 function App() {
   return (
     <div className="App">
@@ -23,3 +37,5 @@ function App() {
     </div>
   );
 }
+
+export default App;
