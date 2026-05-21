@@ -10,7 +10,6 @@ import { Plus, Trash2, X, Brain, Target, RefreshCw, Database, Shield } from "luc
 import { PositionBadge } from "../components/Badges";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
-import AdSlot from "../components/AdSlot";
 
 function relativeTime(iso) {
   if (!iso) return "never";
@@ -309,7 +308,6 @@ export default function MyRankings() {
           </TabsContent>
         </Tabs>
 
-        <AdSlot slot="my-rankings-bottom" />
       </div>
     </div>
   );
