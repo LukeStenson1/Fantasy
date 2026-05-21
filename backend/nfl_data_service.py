@@ -11,7 +11,7 @@ from typing import Iterable
 logger = logging.getLogger("ffref.data")
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
-TOP_N = {"QB": 32, "RB": 70, "WR": 70, "TE": 32, "K": 32}
+TOP_N = {"QB": 64, "RB": 140, "WR": 140, "TE": 64, "K": 32}
 
 TEAM_CODE_ALIASES = {
     "LA": "LAR", "JAC": "JAX", "STL": "LAR", "SD": "LAC",
