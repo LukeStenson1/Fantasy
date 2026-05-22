@@ -728,6 +728,15 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict, kicking
                     existing_season['fpts_per_game_standard'] = round(fpts / games, 2)
                     existing_season['fpts_per_game_half_ppr'] = round(fpts / games, 2)
                     existing_season['fpts_per_game_ppr'] = round(fpts / games, 2)
+                    existing_season['fg_made'] = k_data.get('fg_made', 0)
+                    existing_season['fg_att'] = k_data.get('fg_att', 0)
+                    existing_season['fg_made_40_49'] = k_data.get('fg_made_40_49', 0)
+                    existing_season['fg_made_50_59'] = k_data.get('fg_made_50_59', 0)
+                    existing_season['fg_made_60_'] = k_data.get('fg_made_60_', 0)
+                    existing_season['pat_made'] = k_data.get('pat_made', 0)
+                    existing_season['pat_att'] = k_data.get('pat_att', 0)
+                    if existing_season.get('fg_att', 0) > 0:
+                        existing_season['fg_pct'] = round(existing_season['fg_made'] / existing_season['fg_att'] * 100, 1)
                     applied += 1
                     if applied == 1:
                         logger.info(f"First kicker season after merge: fg_made={existing_season.get('fg_made')}, fpts={existing_season.get('fpts_half_ppr')}")
