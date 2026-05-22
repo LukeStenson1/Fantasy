@@ -76,79 +76,39 @@ def _fetch_injuries_sync() -> list[dict]:
     return _fetch_url_sync(ESPN_INJURIES_URL)
 
 
-def _fetch_news_sync() -> list[dict]:
-    """Fetch latest NFL news from ESPN. Returns list of article dicts."""
-    try:
-        payload = _fetch_url_sync(ESPN_NEWS_URL)
-        if not isinstance(payload, dict):
-            logger.warning(f"ESPN news unexpected response type: {type(payload)}")
-            return []
-        articles = payload.get("articles", []) or []
-        # Filter to only dict articles
-        articles = [a for a in articles if isinstance(a, dict)]
-        # Debug: log first article structure
-        if articles:
-            first = articles[0]
-            logger.info(f"ESPN article sample keys: {list(first.keys())}")
-            logger.info(f"ESPN article categories sample: {first.get('categories', [])[:3]}")
-        news_items = []
-        for a in articles:
-            # Extract team references from categories
-            teams = []
-            for cat in (a.get("categories") or []):
-                if cat.get("type") == "team":
-                    # Try abbreviation first, then team description
-                    abv = cat.get("abbreviation", "")
-                    code = ESPN_ABV_TO_CODE.get(abv.upper())
-                    if not code:
-                        # Try matching by full team name
-                        desc = cat.get("description", "")
-                        code = ESPN_TO_CODE.get(desc)
-                    if not code:
-                        # Try nested team object
-                        team_obj = cat.get("team", {})
-                        if isinstance(team_obj, dict):
-                            desc = team_obj.get("description", "")
-                            code = ESPN_TO_CODE.get(desc)
-                    if code:
-                        teams.append(code)
-                    else:
-                        # Try abbreviation as fallback
-                        abv = cat.get("abbreviation", "")
-                        code = ESPN_ABV_TO_CODE.get(abv.upper())
-                        if code:
-                            teams.append(code)
-                # Also check athlete references
-                if cat.get("type") == "athlete":
-                    pass  # athlete name in description
+async def refresh_news(db, news_items: list[dict]) -> int:
+    """Match news articles to players by team and update their news field.
+    Each player gets up to 6 most recent articles from their team."""
+    if not news_items:
+        return 0
 
-            # Extract player names from description/headline
-            headline = a.get("headline") or a.get("title") or ""
-            description = a.get("description") or ""
-            published = a.get("published") or a.get("lastModified") or ""
-            url = ""
-            links = a.get("links") or {}
-            if isinstance(links, dict):
-                web = links.get("web")
-                if isinstance(web, dict):
-                    url = web.get("href", "")
-                elif isinstance(web, list) and web:
-                    url = web[0].get("href", "") if isinstance(web[0], dict) else ""
+    # Build team -> news list map
+    team_news: dict[str, list[dict]] = {}
+    for item in news_items:
+        for team in item.get("teams", []):
+            team_news.setdefault(team, []).append(item)
 
-            news_items.append({
-                "headline": headline,
-                "snippet": description[:300] if description else "",
-                "url": url,
-                "date": published[:10] if published else "",
-                "source": "ESPN",
-                "teams": teams,
-            })
-        logger.info(f"ESPN news: fetched {len(news_items)} articles")
-        return news_items
-    except Exception as e:
-        logger.warning(f"ESPN news fetch failed: {e}")
-        return []
+    logger.info(f"News team_news keys: {list(team_news.keys())[:10]}")
+    logger.info(f"Sample news item teams: {[item.get('teams') for item in news_items[:5]]}")
 
+    # Keep only 6 per team, sorted by date desc
+    for team in team_news:
+        team_news[team] = sorted(
+            team_news[team],
+            key=lambda x: x.get("date", ""),
+            reverse=True
+        )[:6]
+
+    updated = 0
+    for team, articles in team_news.items():
+        result = await db.players.update_many(
+            {"team": team, "position": {"$in": ["QB", "RB", "WR", "TE", "K"]}},
+            {"$set": {"news": articles}}
+        )
+        updated += result.modified_count
+
+    logger.info(f"News refresh: updated {updated} players across {len(team_news)} teams")
+    return updated
 
 FANTASY_KEYWORDS = [
     "fantasy", "targets", "touches", "snap", "snaps", "carries", "role",
