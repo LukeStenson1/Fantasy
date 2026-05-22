@@ -47,7 +47,9 @@ const COLUMNS_DEF = [
   { key: "fumbles_forced", label: "FF", sortable: true, fromCurrent: true, type: "num" },
   { key: "def_tds", label: "TD", sortable: true, fromCurrent: true, type: "num" },
   { key: "points_allowed", label: "Pts All", sortable: true, fromCurrent: true, type: "num" },
-  { key: "yards_allowed", label: "Yds All", sortable: true, fromCurrent: true, type: "num" },
+  { key: "pass_yards_allowed", label: "Pass Yds", sortable: true, fromCurrent: true, type: "num" },
+  { key: "rush_yards_allowed", label: "Rush Yds", sortable: true, fromCurrent: true, type: "num" },
+  { key: "yards_allowed", label: "Tot Yds", sortable: true, fromCurrent: true, type: "num" },
   { key: "next_opponent", label: "Next Opp", sortable: false },
   { key: "matchup_score", label: "Matchup", sortable: false },
 ];
