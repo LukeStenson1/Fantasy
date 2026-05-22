@@ -688,7 +688,7 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
                     return {"status": "skipped", "reason": "fresh", "players": count}
 
     loop = asyncio.get_event_loop()
-    seasonal_dfs, roster_dfs = await loop.run_in_executor(None, _fetch_seasons_sync, seasons)
+    seasonal_dfs, roster_dfs, kicking_dfs, team_def_dfs = await loop.run_in_executor(None, _fetch_seasons_sync, seasons)
 
     available = [s for s, df in seasonal_dfs.items() if df is not None and not df.empty]
     available_rosters = [s for s, df in roster_dfs.items() if df is not None and not df.empty]
