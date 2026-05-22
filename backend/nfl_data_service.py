@@ -396,6 +396,67 @@ def _compute_dvp_from_weekly(weekly_df) -> dict:
     logger.info(f"DvP computed from {target_season} weekly data: {sum(len(v) for v in out.values())} cells")
     return out
 
+def _compute_kicker_stats_from_weekly(weekly_df) -> dict:
+    """Extract kicker fantasy points from weekly play-by-play style stats."""
+    import pandas as pd
+    if weekly_df is None or weekly_df.empty:
+        return {}
+
+    # Filter to kickers
+    if 'position' not in weekly_df.columns:
+        return {}
+
+    k_df = weekly_df[weekly_df['position'] == 'K'].copy()
+    if k_df.empty:
+        return {}
+
+    # Find fantasy points column
+    fp_col = None
+    for candidate in ['fantasy_points', 'fantasy_points_ppr']:
+        if candidate in k_df.columns:
+            fp_col = candidate
+            break
+    if not fp_col:
+        return {}
+
+    # Also look for FG columns in weekly data
+    fg_cols = {}
+    for col in ['fg_made', 'fg_att', 'fg_made_40_49', 'fg_made_50_59', 'fg_made_60_',
+                'pat_made', 'pat_att']:
+        if col in k_df.columns:
+            fg_cols[col] = 'sum'
+
+    agg = {fp_col: 'sum'}
+    agg.update(fg_cols)
+    agg['_season'] = 'first'
+
+    if 'player_id' not in k_df.columns:
+        return {}
+
+    # Group by player_id and season
+    result = {}
+    for season in k_df['_season'].unique():
+        season_df = k_df[k_df['_season'] == season]
+        games = season_df.groupby('player_id').size().reset_index(name='games')
+        stats = season_df.groupby('player_id').agg(agg).reset_index()
+        stats = stats.merge(games, on='player_id', how='left')
+
+        for _, row in stats.iterrows():
+            pid = row['player_id']
+            if pd.isna(pid):
+                continue
+            fpts = float(row.get(fp_col, 0) or 0)
+            games_played = int(row.get('games', 1) or 1)
+            result.setdefault(pid, {})[int(season)] = {
+                'fpts': round(fpts, 2),
+                'fpts_per_game': round(fpts / max(games_played, 1), 2),
+                'games': games_played,
+                **{c: int(row.get(c, 0) or 0) for c in fg_cols if c != '_season'},
+            }
+
+    logger.info(f"Kicker stats from weekly: {len(result)} kickers")
+    return result
+
 def _fetch_schedule_sync(seasons: Iterable[int]):
     try:
         import nflreadpy as nfl
