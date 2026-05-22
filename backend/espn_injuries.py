@@ -75,6 +75,60 @@ def _fetch_url_sync(url: str) -> dict | list:
 def _fetch_injuries_sync() -> list[dict]:
     return _fetch_url_sync(ESPN_INJURIES_URL)
 
+def _fetch_news_sync() -> list[dict]:
+    """Fetch latest NFL news from ESPN. Returns list of article dicts."""
+    try:
+        payload = _fetch_url_sync(ESPN_NEWS_URL)
+        if not isinstance(payload, dict):
+            logger.warning(f"ESPN news unexpected response type: {type(payload)}")
+            return []
+        articles = payload.get("articles", []) or []
+        articles = [a for a in articles if isinstance(a, dict)]
+        if articles:
+            first = articles[0]
+            logger.info(f"ESPN article sample keys: {list(first.keys())}")
+            logger.info(f"ESPN article categories sample: {first.get('categories', [])[:3]}")
+        news_items = []
+        for a in articles:
+            teams = []
+            for cat in (a.get("categories") or []):
+                if cat.get("type") == "team":
+                    abv = cat.get("abbreviation", "")
+                    code = ESPN_ABV_TO_CODE.get(abv.upper())
+                    if not code:
+                        desc = cat.get("description", "")
+                        code = ESPN_TO_CODE.get(desc)
+                    if not code:
+                        team_obj = cat.get("team", {})
+                        if isinstance(team_obj, dict):
+                            desc = team_obj.get("description", "")
+                            code = ESPN_TO_CODE.get(desc)
+                    if code:
+                        teams.append(code)
+            headline = a.get("headline") or a.get("title") or ""
+            description = a.get("description") or ""
+            published = a.get("published") or a.get("lastModified") or ""
+            url = ""
+            links = a.get("links") or {}
+            if isinstance(links, dict):
+                web = links.get("web")
+                if isinstance(web, dict):
+                    url = web.get("href", "")
+                elif isinstance(web, list) and web:
+                    url = web[0].get("href", "") if isinstance(web[0], dict) else ""
+            news_items.append({
+                "headline": headline,
+                "snippet": description[:300] if description else "",
+                "url": url,
+                "date": published[:10] if published else "",
+                "source": "ESPN",
+                "teams": teams,
+            })
+        logger.info(f"ESPN news: fetched {len(news_items)} articles")
+        return news_items
+    except Exception as e:
+        logger.warning(f"ESPN news fetch failed: {e}")
+        return []
 
 async def refresh_news(db, news_items: list[dict]) -> int:
     """Match news articles to players by team and update their news field.
