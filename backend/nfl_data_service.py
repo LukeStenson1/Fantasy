@@ -1019,7 +1019,7 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
                     "fumbles_forced": int(row.get("sack_fumbles_lost", 0) or 0),
                     "fumbles_recovered": 0,
                     "def_tds": pass_tds + rush_tds,
-                    "points_allowed": 0,
+                    "points_allowed": int(row.get("points_allowed", 0) or 0),
                     "pass_yards_allowed": pass_yds,
                     "rush_yards_allowed": rush_yds,
                     "yards_allowed": pass_yds + rush_yds,
