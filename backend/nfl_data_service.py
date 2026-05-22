@@ -127,8 +127,11 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
 
     seasonal_dfs = {}
     roster_dfs = {}
+    kicking_dfs = {}
+    team_def_dfs = {}
 
     for s in seasons:
+        # ── Offensive stats ──
         try:
             df = nfl.load_player_stats([s])
             if hasattr(df, 'to_pandas'):
@@ -167,6 +170,79 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
             logger.warning(f"Season {s} stats not available via nflreadpy: {e}")
             seasonal_dfs[s] = None
 
+        # ── Kicking stats ──
+        try:
+            kdf = nfl.load_player_stats([s], stat_type="kicking")
+            if hasattr(kdf, 'to_pandas'):
+                kdf = kdf.to_pandas()
+            if kdf is not None and not kdf.empty:
+                k_agg_cols = {
+                    'fg_made': 'sum', 'fg_att': 'sum', 'fg_missed': 'sum',
+                    'fg_blocked': 'sum', 'fg_long': 'max',
+                    'fg_made_0_19': 'sum', 'fg_made_20_29': 'sum',
+                    'fg_made_30_39': 'sum', 'fg_made_40_49': 'sum',
+                    'fg_made_50_59': 'sum', 'fg_made_60_': 'sum',
+                    'pat_made': 'sum', 'pat_att': 'sum', 'pat_missed': 'sum',
+                }
+                k_existing = {k: v for k, v in k_agg_cols.items() if k in kdf.columns}
+                if 'player_id' in kdf.columns and k_existing:
+                    k_games = kdf.groupby('player_id').size().reset_index(name='games')
+                    k_seasonal = kdf.groupby('player_id').agg(k_existing).reset_index()
+                    k_seasonal = k_seasonal.merge(k_games, on='player_id', how='left')
+                    # Add name/team meta
+                    k_meta_cols = ['player_id']
+                    for col in ['player_display_name', 'player_name', 'team']:
+                        if col in kdf.columns:
+                            k_meta_cols.append(col)
+                    if len(k_meta_cols) > 1:
+                        k_meta = kdf.groupby('player_id')[k_meta_cols[1:]].first().reset_index()
+                        k_seasonal = k_seasonal.merge(k_meta, on='player_id', how='left')
+                    k_seasonal = k_seasonal.rename(columns={'player_display_name': 'player_name'})
+                    # Compute fg_pct
+                    if 'fg_made' in k_seasonal.columns and 'fg_att' in k_seasonal.columns:
+                        k_seasonal['fg_pct'] = (
+                            k_seasonal['fg_made'] / k_seasonal['fg_att'].replace(0, 1) * 100
+                        ).round(1)
+                    kicking_dfs[s] = k_seasonal
+                    logger.info(f"Fetched {s} kicking stats: {len(k_seasonal)} kickers")
+                else:
+                    kicking_dfs[s] = None
+            else:
+                kicking_dfs[s] = None
+        except Exception as e:
+            logger.warning(f"Season {s} kicking stats not available: {e}")
+            kicking_dfs[s] = None
+
+        # ── Team defensive stats ──
+        try:
+            tdf = nfl.load_team_stats([s])
+            if hasattr(tdf, 'to_pandas'):
+                tdf = tdf.to_pandas()
+            if tdf is not None and not tdf.empty:
+                def_cols = {
+                    'def_sacks': 'sum', 'def_interceptions': 'sum',
+                    'def_fumbles_forced': 'sum', 'def_fumbles_recovered': 'sum',
+                    'def_tds': 'sum', 'def_safety': 'sum',
+                    'points_allowed': 'sum', 'yards_allowed': 'sum',
+                    'pass_yards_allowed': 'sum', 'rush_yards_allowed': 'sum',
+                }
+                d_existing = {k: v for k, v in def_cols.items() if k in tdf.columns}
+                team_col = next((c for c in ['team', 'team_abbr', 'posteam', 'defteam'] if c in tdf.columns), None)
+                if team_col and d_existing:
+                    team_def = tdf.groupby(team_col).agg(d_existing).reset_index()
+                    team_def = team_def.rename(columns={team_col: 'team'})
+                    team_def_dfs[s] = team_def
+                    logger.info(f"Fetched {s} team defense stats: {len(team_def)} teams")
+                else:
+                    logger.warning(f"Season {s} team stats missing expected columns. Have: {list(tdf.columns)[:20]}")
+                    team_def_dfs[s] = None
+            else:
+                team_def_dfs[s] = None
+        except Exception as e:
+            logger.warning(f"Season {s} team defense stats not available: {e}")
+            team_def_dfs[s] = None
+
+        # ── Rosters ──
         try:
             roster = nfl.load_rosters([s])
             if hasattr(roster, 'to_pandas'):
@@ -195,7 +271,7 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
             logger.warning(f"Season {s} roster not available via nflreadpy: {e}")
             roster_dfs[s] = None
 
-    return seasonal_dfs, roster_dfs
+    return seasonal_dfs, roster_dfs, kicking_dfs, team_def_dfs
 
 def _fetch_weekly_sync(seasons: Iterable[int]):
     try:
