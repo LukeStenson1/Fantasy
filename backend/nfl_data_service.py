@@ -1056,9 +1056,10 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
         for code, _ in NFL_TEAMS:
             seasons_list = sorted(def_lookup.get(code, []), key=lambda x: x["season"])
             if seasons_list:
+                def_tag = _detect_tag(seasons_list, "DEF")
                 await db.players.update_one(
                     {"ext_id": f"DEF_{code}"},
-                    {"$set": {"seasons": seasons_list}}
+                    {"$set": {"seasons": seasons_list, "tag": def_tag}}
                 )
         logger.info(f"DEF stats attached for {len(def_lookup)} teams")
 
