@@ -874,6 +874,7 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
     dvp_seasons = available or available_rosters
     weekly_df = await loop.run_in_executor(None, _fetch_weekly_sync, dvp_seasons)
     dvp_live = await loop.run_in_executor(None, _compute_dvp_from_weekly, weekly_df)
+    kicker_stats = await loop.run_in_executor(None, _compute_kicker_stats_from_weekly, weekly_df)
     global _DVP_LIVE
     if dvp_live:
         _DVP_LIVE = dvp_live
