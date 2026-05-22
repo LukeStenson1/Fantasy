@@ -174,6 +174,9 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
                     seasonal = seasonal.rename(columns={'player_display_name': 'player_name', 'recent_team': 'team'})
                     seasonal_dfs[s] = seasonal
                     logger.info(f"Fetched {s} seasonal stats: {len(seasonal)} players")
+                    if s == 2025 and 'position' in seasonal.columns:
+                        positions = seasonal['position'].value_counts().to_dict()
+                        logger.info(f"2025 positions in seasonal stats: {positions}")
                 else:
                     seasonal_dfs[s] = None
             else:
