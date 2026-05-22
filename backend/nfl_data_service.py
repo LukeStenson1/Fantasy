@@ -410,14 +410,9 @@ def _compute_kicker_stats_from_weekly(weekly_df) -> dict:
     if k_df.empty:
         return {}
 
-    # Find fantasy points column
-    fp_col = None
-    for candidate in ['fantasy_points', 'fantasy_points_ppr']:
-        if candidate in k_df.columns:
-            fp_col = candidate
-            break
-    if not fp_col:
-        return {}
+    # We'll compute FPts from FG stats rather than use fantasy_points column
+    # which is 0 for kickers in nflverse
+    fp_col = next((c for c in ['fantasy_points', 'fantasy_points_ppr'] if c in k_df.columns), None)
 
     # Also look for FG columns in weekly data
     fg_cols = {}
