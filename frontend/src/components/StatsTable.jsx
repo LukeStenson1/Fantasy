@@ -254,6 +254,7 @@ function ExpandedContent({ player, scoring }) {
               <thead><tr>
                 <th>Season</th><th>G</th>
                 {!isK && <><th>Pass Yd</th><th>Pass TD</th><th>INT</th><th>Rush Yd</th><th>Rush TD</th><th>Rec</th><th>Tgt</th><th>Rec Yd</th><th>Rec TD</th></>}
+                {isK && <><th>FGM</th><th>FGA</th><th>FG%</th><th>40-49</th><th>50-59</th><th>60+</th><th>PAT</th></>}
                 <th className="text-emerald-300">FPts</th><th className="text-emerald-300">FPts/G</th>
               </tr></thead>
               <tbody>
@@ -271,6 +272,15 @@ function ExpandedContent({ player, scoring }) {
                       <td className="font-mono-tab">{s.targets || "—"}</td>
                       <td className="font-mono-tab">{s.rec_yds?.toLocaleString() || "—"}</td>
                       <td className="font-mono-tab">{s.rec_td || "—"}</td>
+                    </>}
+                    {isK && <>
+                      <td className="font-mono-tab">{s.fg_made ?? "—"}</td>
+                      <td className="font-mono-tab">{s.fg_att ?? "—"}</td>
+                      <td className="font-mono-tab">{s.fg_pct ? `${s.fg_pct}%` : "—"}</td>
+                      <td className="font-mono-tab">{s.fg_made_40_49 ?? "—"}</td>
+                      <td className="font-mono-tab">{s.fg_made_50_59 ?? "—"}</td>
+                      <td className="font-mono-tab">{s.fg_made_60_ ?? "—"}</td>
+                      <td className="font-mono-tab">{s.pat_made ?? "—"}</td>
                     </>}
                     <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_${scoring}`]}</td>
                     <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_per_game_${scoring}`]}</td>
