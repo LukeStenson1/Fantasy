@@ -723,6 +723,8 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict, kicking
                     existing_season['fpts_per_game_half_ppr'] = round(fpts / games, 2)
                     existing_season['fpts_per_game_ppr'] = round(fpts / games, 2)
                     applied += 1
+                    if applied == 1:
+                        logger.info(f"First kicker season after merge: fg_made={existing_season.get('fg_made')}, fpts={existing_season.get('fpts_half_ppr')}")
         logger.info(f"Kicker FPts applied to {applied} season records")
     
     # ── Step 2: Build rookie_meta ──
