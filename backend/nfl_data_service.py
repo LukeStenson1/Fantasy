@@ -992,15 +992,19 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
                 if not team or (isinstance(team, float) and pd.isna(team)):
                     continue
                 team = normalize_team(str(team))
+                pass_yds = int(row.get("passing_yards", 0) or 0)
+                rush_yds = int(row.get("rushing_yards", 0) or 0)
+                pass_tds = int(row.get("passing_tds", 0) or 0)
+                rush_tds = int(row.get("rushing_tds", 0) or 0)
                 def_lookup.setdefault(team, []).append({
                     "season": int(season),
-                    "sacks": int(row.get("def_sacks", 0) or 0),
-                    "interceptions": int(row.get("def_interceptions", 0) or 0),
-                    "fumbles_forced": int(row.get("def_fumbles_forced", 0) or 0),
-                    "fumbles_recovered": int(row.get("def_fumbles_recovered", 0) or 0),
-                    "def_tds": int(row.get("def_tds", 0) or 0),
-                    "points_allowed": int(row.get("points_allowed", 0) or 0),
-                    "yards_allowed": int(row.get("yards_allowed", 0) or 0),
+                    "sacks": int(row.get("sacks_suffered", 0) or 0),
+                    "interceptions": int(row.get("passing_interceptions", 0) or 0),
+                    "fumbles_forced": int(row.get("sack_fumbles_lost", 0) or 0),
+                    "fumbles_recovered": 0,
+                    "def_tds": pass_tds + rush_tds,
+                    "points_allowed": 0,
+                    "yards_allowed": pass_yds + rush_yds,
                 })
         for code, _ in NFL_TEAMS:
             seasons_list = sorted(def_lookup.get(code, []), key=lambda x: x["season"])
