@@ -455,6 +455,10 @@ def _compute_kicker_stats_from_weekly(weekly_df) -> dict:
             }
 
     logger.info(f"Kicker stats from weekly: {len(result)} kickers")
+    # Log sample kicker data
+    sample_pid = next(iter(result), None)
+    if sample_pid:
+        logger.info(f"Sample kicker stats: pid={sample_pid}, data={result[sample_pid]}")
     return result
 
 def _fetch_schedule_sync(seasons: Iterable[int]):
