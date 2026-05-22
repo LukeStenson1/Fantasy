@@ -206,11 +206,23 @@ async def list_players(
         info = get_next_opponent(p.get("team", ""))
         if info:
             p["next_opponent"] = info["opponent"]
-            p["matchup_score"] = matchup_score(info["opponent"], p["position"])
-            dvp = get_def_dvp(info["opponent"], p["position"])
-            p["matchup_def_rank"] = dvp.get("rank", 16)
-            p["matchup_def_fpts_allowed"] = dvp.get("fpts_allowed_per_game")
-            p["matchup_def_source"] = dvp.get("source")
+            if p["position"] == "DEF":
+                # For DEF, matchup score = average offensive strength of opponent
+                # High avg DvP rank opponent = easy matchup for DEF
+                opp = info["opponent"]
+                pos_ranks = []
+                for pos in ["QB", "RB", "WR", "TE"]:
+                    rank = get_def_rank(p.get("team", ""), pos)
+                    pos_ranks.append(rank)
+                avg_rank = sum(pos_ranks) / len(pos_ranks) if pos_ranks else 16
+                # High rank = tough defense = good DEF matchup score
+                p["matchup_score"] = round((avg_rank - 16.5) / 7.75, 2)
+            else:
+                p["matchup_score"] = matchup_score(info["opponent"], p["position"])
+                dvp = get_def_dvp(info["opponent"], p["position"])
+                p["matchup_def_rank"] = dvp.get("rank", 16)
+                p["matchup_def_fpts_allowed"] = dvp.get("fpts_allowed_per_game")
+                p["matchup_def_source"] = dvp.get("source")
     # Include rookies / DEF / K (no seasonal stats) ONLY when explicitly searching or filtering for them
     has_explicit_filter = bool(search) or position in ("DEF", "K") or tag is not None
     if not has_explicit_filter:
