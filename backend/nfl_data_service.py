@@ -1013,6 +1013,8 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
                     "fumbles_recovered": 0,
                     "def_tds": pass_tds + rush_tds,
                     "points_allowed": 0,
+                    "pass_yards_allowed": pass_yds,
+                    "rush_yards_allowed": rush_yds,
                     "yards_allowed": pass_yds + rush_yds,
                 })
         for code, _ in NFL_TEAMS:
