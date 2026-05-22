@@ -853,6 +853,18 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
         })
     await db.players.insert_many(def_docs)
 
+    # Attach team defensive stats to DEF players
+    if team_def_lookup:
+        for code, _ in NFL_TEAMS:
+            def_seasons = []
+            for season in sorted(team_def_lookup.get(code, {}).keys()):
+                def_seasons.append(team_def_lookup[code][season])
+            if def_seasons:
+                await db.players.update_one(
+                    {"ext_id": f"DEF_{code}"},
+                    {"$set": {"seasons": def_seasons}}
+                )
+
     await db.meta.replace_one(
         {"key": "last_refresh"},
         {"key": "last_refresh", "value": datetime.now(timezone.utc).isoformat(), "seasons": available, "count": len(merged)},
