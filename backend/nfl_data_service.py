@@ -123,16 +123,13 @@ def _detect_tag(seasons: list[dict], position: str) -> str | None:
             return "risk"
         return None
 
-    # DEF tags based on sacks + INTs (most reliable metric we have)
     if position == "DEF":
         sacks = latest.get("sacks", 0)
         ints = latest.get("interceptions", 0)
         takeaways = sacks + ints
-        if takeaways >= 60:
+        if takeaways >= 75:
             return "elite"
-        if takeaways >= 50:
-            return "sleeper"
-        if takeaways < 35:
+        if takeaways < 30:
             return "risk"
         return None
 
