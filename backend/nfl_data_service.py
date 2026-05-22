@@ -518,7 +518,95 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict, kicking
             if team and not (isinstance(team, float) and pd.isna(team)):
                 entry["team"] = normalize_team(team)
             entry["seasons"].append(_season_record(dict(row), season))
+            
+    # ── Step 1b: Merge kicking stats into K player seasons ──
+    if kicking_dfs:
+        for season, kdf in kicking_dfs.items():
+            if kdf is None or kdf.empty:
+                continue
+            for _, row in kdf.iterrows():
+                pid = row.get("player_id")
+                if not pid or (isinstance(pid, float) and pd.isna(pid)):
+                    continue
+                if pid not in all_player_seasons:
+                    # Add kicker not in offensive stats
+                    name = row.get("player_name") or ""
+                    team = row.get("team") or ""
+                    if not name or (isinstance(name, float) and pd.isna(name)):
+                        continue
+                    all_player_seasons[pid] = {
+                        "ext_id": pid,
+                        "name": str(name),
+                        "position": "K",
+                        "team": normalize_team(team) if team else "",
+                        "birth_date": None,
+                        "seasons": [],
+                    }
+                # Find or create season record for this kicker
+                entry = all_player_seasons[pid]
+                entry["position"] = "K"
+                existing_season = next((s for s in entry["seasons"] if s["season"] == season), None)
+                if existing_season is None:
+                    existing_season = {
+                        "season": season, "games": int(row.get("games", 0) or 0),
+                        "pass_yds": 0, "pass_td": 0, "pass_int": 0,
+                        "rush_yds": 0, "rush_td": 0, "rush_att": 0,
+                        "receptions": 0, "targets": 0, "rec_yds": 0, "rec_td": 0,
+                        "fumbles_lost": 0, "total_yards": 0, "total_tds": 0,
+                        "fpts_standard": 0.0, "fpts_half_ppr": 0.0, "fpts_ppr": 0.0,
+                        "fpts_per_game_standard": 0.0, "fpts_per_game_half_ppr": 0.0,
+                        "fpts_per_game_ppr": 0.0,
+                    }
+                    entry["seasons"].append(existing_season)
+                # Merge kicking stats
+                for k_col in ['fg_made', 'fg_att', 'fg_pct', 'fg_long',
+                               'fg_made_0_19', 'fg_made_20_29', 'fg_made_30_39',
+                               'fg_made_40_49', 'fg_made_50_59', 'fg_made_60_',
+                               'pat_made', 'pat_att']:
+                    v = row.get(k_col)
+                    if v is not None and not (isinstance(v, float) and pd.isna(v)):
+                        existing_season[k_col] = float(v) if k_col in ('fg_pct',) else int(v)
+                # Compute fantasy points for kicker
+                fg = existing_season.get("fg_made", 0)
+                pat = existing_season.get("pat_made", 0)
+                fg_50 = existing_season.get("fg_made_50_59", 0) + existing_season.get("fg_made_60_", 0)
+                fg_40 = existing_season.get("fg_made_40_49", 0)
+                fg_under40 = fg - fg_40 - fg_50
+                # Standard kicker scoring: FG < 40 = 3pts, 40-49 = 4pts, 50+ = 5pts, PAT = 1pt
+                fpts = (fg_under40 * 3) + (fg_40 * 4) + (fg_50 * 5) + (pat * 1)
+                games = max(existing_season.get("games", 1), 1)
+                existing_season["fpts_standard"] = round(fpts, 2)
+                existing_season["fpts_half_ppr"] = round(fpts, 2)
+                existing_season["fpts_ppr"] = round(fpts, 2)
+                existing_season["fpts_per_game_standard"] = round(fpts / games, 2)
+                existing_season["fpts_per_game_half_ppr"] = round(fpts / games, 2)
+                existing_season["fpts_per_game_ppr"] = round(fpts / games, 2)
 
+    # ── Step 1c: Store team defensive stats ──
+    team_def_lookup: dict[str, dict] = {}
+    if team_def_dfs:
+        for season, tdf in team_def_dfs.items():
+            if tdf is None or tdf.empty:
+                continue
+            for _, row in tdf.iterrows():
+                team = row.get("team")
+                if not team or (isinstance(team, float) and pd.isna(team)):
+                    continue
+                team = normalize_team(str(team))
+                if team not in team_def_lookup:
+                    team_def_lookup[team] = {}
+                team_def_lookup[team][season] = {
+                    "season": season,
+                    "sacks": int(row.get("def_sacks", 0) or 0),
+                    "interceptions": int(row.get("def_interceptions", 0) or 0),
+                    "fumbles_forced": int(row.get("def_fumbles_forced", 0) or 0),
+                    "fumbles_recovered": int(row.get("def_fumbles_recovered", 0) or 0),
+                    "def_tds": int(row.get("def_tds", 0) or 0),
+                    "points_allowed": int(row.get("points_allowed", 0) or 0),
+                    "yards_allowed": int(row.get("yards_allowed", 0) or 0),
+                }
+        logger.info(f"Team defense stats loaded: {len(team_def_lookup)} teams")
+        
     # ── Step 2: Build rookie_meta ──
     available_roster_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
     latest_roster_season = available_roster_seasons[-1] if available_roster_seasons else None
