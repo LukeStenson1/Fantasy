@@ -97,9 +97,19 @@ def _fetch_news_sync() -> list[dict]:
             teams = []
             for cat in (a.get("categories") or []):
                 if cat.get("type") == "team":
-                    # Try description (full team name) first
-                    desc = cat.get("description", "")
-                    code = ESPN_TO_CODE.get(desc)
+                    # Try abbreviation first, then team description
+                    abv = cat.get("abbreviation", "")
+                    code = ESPN_ABV_TO_CODE.get(abv.upper())
+                    if not code:
+                        # Try matching by full team name
+                        desc = cat.get("description", "")
+                        code = ESPN_TO_CODE.get(desc)
+                    if not code:
+                        # Try nested team object
+                        team_obj = cat.get("team", {})
+                        if isinstance(team_obj, dict):
+                            desc = team_obj.get("description", "")
+                            code = ESPN_TO_CODE.get(desc)
                     if code:
                         teams.append(code)
                     else:
