@@ -109,32 +109,31 @@ def _detect_tag(seasons: list[dict], position: str) -> str | None:
     seasons_sorted = sorted(seasons, key=lambda s: s["season"])
     latest = seasons_sorted[-1]
 
-    # Kicker tags
+    # Kicker tags based on FPts/G
     if position == "K":
         fppg = latest.get("fpts_per_game_half_ppr", 0)
         games = latest.get("games", 0)
-        if fppg >= 9.0 and games >= 12:
+        if fppg >= 11.0 and games >= 14:
             return "elite"
-        if fppg >= 7.0 and games >= 12:
+        if fppg >= 9.0 and games >= 14:
             return "sleeper"
-        if games > 0 and games < 10:
+        if games > 0 and games < 8:
             return "risk"
-        if fppg < 5.0 and games >= 10:
+        if fppg < 6.0 and games >= 10:
             return "risk"
         return None
 
-    # DEF tags
+    # DEF tags based on sacks + INTs (most reliable metric we have)
     if position == "DEF":
-        yards = latest.get("yards_allowed", 0)
-        points = latest.get("points_allowed", 0)
         sacks = latest.get("sacks", 0)
         ints = latest.get("interceptions", 0)
-        if yards > 0 and yards < 4500 and (sacks + ints) > 50:
+        takeaways = sacks + ints
+        if takeaways >= 60:
             return "elite"
-        if yards > 6000 or points > 350:
-            return "risk"
-        if (sacks + ints) > 45:
+        if takeaways >= 50:
             return "sleeper"
+        if takeaways < 35:
+            return "risk"
         return None
 
     fppg = latest.get("fpts_per_game_half_ppr", 0)
