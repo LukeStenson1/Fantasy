@@ -184,7 +184,12 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
 
         # ── Kicking stats ──
         try:
-            kdf = nfl.load_player_stats([s], stat_type="kicking")
+            kdf = nfl.load_player_stats([s], stat_type="kicking") if hasattr(nfl, 'load_kicking_stats') else None
+            if kdf is None:
+                try:
+                    kdf = nfl.load_kicking_stats([s])
+                except Exception:
+                    kdf = None
             if hasattr(kdf, 'to_pandas'):
                 kdf = kdf.to_pandas()
             if kdf is not None and not kdf.empty:
