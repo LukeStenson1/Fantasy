@@ -882,7 +882,7 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
     if not available and not available_rosters:
         return {"status": "error", "reason": "no_data"}
 
-    players = await loop.run_in_executor(None, _build_players_from_dataframes, seasonal_dfs, roster_dfs, kicking_dfs, team_def_dfs)
+    players = await loop.run_in_executor(None, _build_players_from_dataframes, seasonal_dfs, roster_dfs, kicking_dfs, team_def_dfs, kicker_stats)
     if not players:
         return {"status": "error", "reason": "no_players_built"}
 
