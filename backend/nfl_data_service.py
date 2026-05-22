@@ -241,28 +241,35 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
             if hasattr(tdf, 'to_pandas'):
                 tdf = tdf.to_pandas()
             if tdf is not None and not tdf.empty:
-                # load_team_stats returns the OPPONENT's offensive stats
-                # so passing_yards = yards allowed, passing_interceptions = DEF INTs, etc.
-                def_cols = {
-                    'passing_interceptions': 'sum',  # DEF interceptions
-                    'sacks_suffered': 'sum',          # sacks by this defense
-                    'sack_fumbles_lost': 'sum',       # fumbles forced
-                    'passing_yards': 'sum',            # pass yards allowed
-                    'rushing_yards': 'sum',            # rush yards allowed
-                    'passing_tds': 'sum',              # pass TDs allowed
-                    'rushing_tds': 'sum',              # rush TDs allowed
-                }
-                d_existing = {k: v for k, v in def_cols.items() if k in tdf.columns}
-                team_col = next((c for c in ['team', 'team_abbr', 'posteam', 'defteam'] if c in tdf.columns), None)
-                if team_col and d_existing:
-                    team_def = tdf.groupby(team_col).agg(d_existing).reset_index()
-                    team_def = team_def.rename(columns={team_col: 'team'})
-                    team_def_dfs[s] = team_def
-                    logger.info(f"Fetched {s} team defense stats: {len(team_def)} teams")
-                    if s == 2025:
-                        logger.info(f"2025 team defense columns: {list(tdf.columns)[:30]}")
+                if s == 2025:
+                    logger.info(f"2025 team defense columns: {list(tdf.columns)[:30]}")
+                # Group by opponent_team to get true defensive stats
+                # (what the opposing offense did TO this team's defense)
+                opp_col = next((c for c in ['opponent_team', 'defteam'] if c in tdf.columns), None)
+                if opp_col:
+                    def_cols = {
+                        'passing_yards': 'sum',
+                        'rushing_yards': 'sum',
+                        'passing_tds': 'sum',
+                        'rushing_tds': 'sum',
+                        'passing_interceptions': 'sum',
+                        'sacks_suffered': 'sum',
+                    }
+                    d_existing = {k: v for k, v in def_cols.items() if k in tdf.columns}
+                    if d_existing:
+                        team_def = tdf.groupby(opp_col).agg(d_existing).reset_index()
+                        team_def = team_def.rename(columns={opp_col: 'team'})
+                        if 'passing_tds' in team_def.columns and 'rushing_tds' in team_def.columns:
+                            team_def['points_allowed'] = (
+                                (team_def['passing_tds'] + team_def['rushing_tds']) * 7
+                            ).astype(int)
+                        team_def_dfs[s] = team_def
+                        logger.info(f"Fetched {s} team defense stats: {len(team_def)} teams")
+                    else:
+                        logger.warning(f"Season {s} team stats missing expected columns. Have: {list(tdf.columns)[:20]}")
+                        team_def_dfs[s] = None
                 else:
-                    logger.warning(f"Season {s} team stats missing expected columns. Have: {list(tdf.columns)[:20]}")
+                    logger.warning(f"Season {s} no opponent_team column found. Have: {list(tdf.columns)[:20]}")
                     team_def_dfs[s] = None
             else:
                 team_def_dfs[s] = None
