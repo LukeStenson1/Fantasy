@@ -255,6 +255,8 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
                     team_def = team_def.rename(columns={team_col: 'team'})
                     team_def_dfs[s] = team_def
                     logger.info(f"Fetched {s} team defense stats: {len(team_def)} teams")
+                    if s == 2025:
+                        logger.info(f"2025 team defense columns: {list(tdf.columns)[:30]}")
                 else:
                     logger.warning(f"Season {s} team stats missing expected columns. Have: {list(tdf.columns)[:20]}")
                     team_def_dfs[s] = None
