@@ -201,6 +201,16 @@ async def list_players(
     cursor = db.players.find(q, {"_id": 0, "news": 0})
     items = await cursor.to_list(length=2000)
     items = [_attach_current_season(p, season, scoring) for p in items]
+    # Attach matchup info for all players
+    for p in items:
+        info = get_next_opponent(p.get("team", ""))
+        if info:
+            p["next_opponent"] = info["opponent"]
+            p["matchup_score"] = matchup_score(info["opponent"], p["position"])
+            dvp = get_def_dvp(info["opponent"], p["position"])
+            p["matchup_def_rank"] = dvp.get("rank", 16)
+            p["matchup_def_fpts_allowed"] = dvp.get("fpts_allowed_per_game")
+            p["matchup_def_source"] = dvp.get("source")
     # Include rookies / DEF / K (no seasonal stats) ONLY when explicitly searching or filtering for them
     has_explicit_filter = bool(search) or position in ("DEF", "K") or tag is not None
     if not has_explicit_filter:
