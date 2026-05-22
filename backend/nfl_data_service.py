@@ -676,7 +676,25 @@ def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict, kicking
                     "yards_allowed": int(row.get("yards_allowed", 0) or 0),
                 }
         logger.info(f"Team defense stats loaded: {len(team_def_lookup)} teams")
-        
+
+    # ── Step 1b: Apply kicker fantasy points from weekly data ──
+    if kicker_stats:
+        for pid, seasons_data in kicker_stats.items():
+            if pid not in all_player_seasons:
+                continue
+            entry = all_player_seasons[pid]
+            for season, k_data in seasons_data.items():
+                existing_season = next((s for s in entry["seasons"] if s["season"] == season), None)
+                if existing_season:
+                    fpts = k_data.get('fpts', 0)
+                    games = max(k_data.get('games', 1), 1)
+                    existing_season['fpts_standard'] = fpts
+                    existing_season['fpts_half_ppr'] = fpts
+                    existing_season['fpts_ppr'] = fpts
+                    existing_season['fpts_per_game_standard'] = round(fpts / games, 2)
+                    existing_season['fpts_per_game_half_ppr'] = round(fpts / games, 2)
+                    existing_season['fpts_per_game_ppr'] = round(fpts / games, 2)
+    
     # ── Step 2: Build rookie_meta ──
     available_roster_seasons = sorted(s for s, r in roster_dfs.items() if r is not None and not r.empty)
     latest_roster_season = available_roster_seasons[-1] if available_roster_seasons else None
