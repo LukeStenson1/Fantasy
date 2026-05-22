@@ -972,6 +972,37 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
         })
     await db.players.insert_many(def_docs)
 
+    # Attach team defensive stats to DEF players
+    if team_def_dfs:
+        import pandas as pd
+        def_lookup: dict[str, list] = {}
+        for season, tdf in team_def_dfs.items():
+            if tdf is None or (hasattr(tdf, 'empty') and tdf.empty):
+                continue
+            for _, row in tdf.iterrows():
+                team = row.get("team")
+                if not team or (isinstance(team, float) and pd.isna(team)):
+                    continue
+                team = normalize_team(str(team))
+                def_lookup.setdefault(team, []).append({
+                    "season": int(season),
+                    "sacks": int(row.get("def_sacks", 0) or 0),
+                    "interceptions": int(row.get("def_interceptions", 0) or 0),
+                    "fumbles_forced": int(row.get("def_fumbles_forced", 0) or 0),
+                    "fumbles_recovered": int(row.get("def_fumbles_recovered", 0) or 0),
+                    "def_tds": int(row.get("def_tds", 0) or 0),
+                    "points_allowed": int(row.get("points_allowed", 0) or 0),
+                    "yards_allowed": int(row.get("yards_allowed", 0) or 0),
+                })
+        for code, _ in NFL_TEAMS:
+            seasons_list = sorted(def_lookup.get(code, []), key=lambda x: x["season"])
+            if seasons_list:
+                await db.players.update_one(
+                    {"ext_id": f"DEF_{code}"},
+                    {"$set": {"seasons": seasons_list}}
+                )
+        logger.info(f"DEF stats attached for {len(def_lookup)} teams")
+
     await db.meta.replace_one(
         {"key": "last_refresh"},
         {"key": "last_refresh", "value": datetime.now(timezone.utc).isoformat(), "seasons": available, "count": len(merged)},
