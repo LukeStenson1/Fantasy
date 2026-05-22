@@ -214,9 +214,10 @@ async def list_players(
                 for pos in ["QB", "RB", "WR", "TE"]:
                     rank = get_def_rank(p.get("team", ""), pos)
                     pos_ranks.append(rank)
-                avg_rank = sum(pos_ranks) / len(pos_ranks) if pos_ranks else 16
-                # High rank = tough defense = good DEF matchup score
-                p["matchup_score"] = round((avg_rank - 16.5) / 7.75, 2)
+              avg_rank = sum(pos_ranks) / len(pos_ranks) if pos_ranks else 16
+                # Low avg_rank = tough defense = bad matchup for opposing offense = good for DEF streaming
+                # High avg_rank = soft defense = good matchup for opposing offense = bad for DEF streaming
+                p["matchup_score"] = round((16.5 - avg_rank) / 7.75, 2)
             else:
                 p["matchup_score"] = matchup_score(info["opponent"], p["position"])
                 dvp = get_def_dvp(info["opponent"], p["position"])
