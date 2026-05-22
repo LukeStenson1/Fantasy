@@ -80,6 +80,19 @@ def _season_record(row, season: int) -> dict:
             (row.get("receiving_fumbles_lost", 0) or 0) +
             (row.get("sack_fumbles_lost", 0) or 0)
         ),
+        # Kicking stats (populated separately for K position)
+        rec["fg_made"] = 0
+        rec["fg_att"] = 0
+        rec["fg_pct"] = 0.0
+        rec["fg_long"] = 0
+        rec["fg_made_0_19"] = 0
+        rec["fg_made_20_29"] = 0
+        rec["fg_made_30_39"] = 0
+        rec["fg_made_40_49"] = 0
+        rec["fg_made_50_59"] = 0
+        rec["fg_made_60_"] = 0
+        rec["pat_made"] = 0
+        rec["pat_att"] = 0
     }
     rec["total_yards"] = rec["pass_yds"] + rec["rush_yds"] + rec["rec_yds"]
     rec["total_tds"] = rec["pass_td"] + rec["rush_td"] + rec["rec_td"]
