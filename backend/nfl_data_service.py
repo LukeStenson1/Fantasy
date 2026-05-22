@@ -428,25 +428,49 @@ def _compute_kicker_stats_from_weekly(weekly_df) -> dict:
     if 'player_id' not in k_df.columns:
         return {}
 
-    # Group by player_id and season
+    # Aggregate FG cols from weekly data
+    fg_agg_cols = {}
+    for col in ['fg_made', 'fg_att', 'fg_made_0_19', 'fg_made_20_29',
+                'fg_made_30_39', 'fg_made_40_49', 'fg_made_50_59', 'fg_made_60_',
+                'pat_made', 'pat_att']:
+        if col in k_df.columns:
+            fg_agg_cols[col] = 'sum'
+
     result = {}
     for season in k_df['_season'].unique():
         season_df = k_df[k_df['_season'] == season]
         games = season_df.groupby('player_id').size().reset_index(name='games')
-        stats = season_df.groupby('player_id').agg(agg).reset_index()
+        if fg_agg_cols:
+            stats = season_df.groupby('player_id').agg(fg_agg_cols).reset_index()
+        else:
+            stats = season_df.groupby('player_id').size().reset_index(name='_count')
         stats = stats.merge(games, on='player_id', how='left')
-
         for _, row in stats.iterrows():
             pid = row['player_id']
             if pd.isna(pid):
                 continue
-            fpts = float(row.get(fp_col, 0) or 0)
             games_played = int(row.get('games', 1) or 1)
-            result.setdefault(pid, {})[int(season)] = {
-                'fpts': round(fpts, 2),
-                'fpts_per_game': round(fpts / max(games_played, 1), 2),
+            # Compute fantasy points from FG stats
+            fg_made = int(row.get('fg_made', 0) or 0)
+            fg_40 = int(row.get('fg_made_40_49', 0) or 0)
+            fg_50 = int(row.get('fg_made_50_59', 0) or 0)
+            fg_60 = int(row.get('fg_made_60_', 0) or 0)
+            fg_50_plus = fg_50 + fg_60
+            fg_under_40 = max(fg_made - fg_40 - fg_50_plus, 0)
+            pat = int(row.get('pat_made', 0) or 0)
+            # Standard kicker scoring
+            fpts = (fg_under_40 * 3) + (fg_40 * 4) + (fg_50_plus * 5) + (pat * 1)
+            result.setdefault(str(pid), {})[int(season)] = {
+                'fpts': round(float(fpts), 2),
+                'fpts_per_game': round(float(fpts) / max(games_played, 1), 2),
                 'games': games_played,
-                **{c: int(row.get(c, 0) or 0) for c in fg_cols if c != '_season'},
+                'fg_made': fg_made,
+                'fg_att': int(row.get('fg_att', 0) or 0),
+                'fg_made_40_49': fg_40,
+                'fg_made_50_59': fg_50,
+                'fg_made_60_': fg_60,
+                'pat_made': pat,
+                'pat_att': int(row.get('pat_att', 0) or 0),
             }
 
     logger.info(f"Kicker stats from weekly: {len(result)} kickers")
