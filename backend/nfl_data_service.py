@@ -241,12 +241,16 @@ def _fetch_seasons_sync(seasons: Iterable[int]):
             if hasattr(tdf, 'to_pandas'):
                 tdf = tdf.to_pandas()
             if tdf is not None and not tdf.empty:
+                # load_team_stats returns the OPPONENT's offensive stats
+                # so passing_yards = yards allowed, passing_interceptions = DEF INTs, etc.
                 def_cols = {
-                    'def_sacks': 'sum', 'def_interceptions': 'sum',
-                    'def_fumbles_forced': 'sum', 'def_fumbles_recovered': 'sum',
-                    'def_tds': 'sum', 'def_safety': 'sum',
-                    'points_allowed': 'sum', 'yards_allowed': 'sum',
-                    'pass_yards_allowed': 'sum', 'rush_yards_allowed': 'sum',
+                    'passing_interceptions': 'sum',  # DEF interceptions
+                    'sacks_suffered': 'sum',          # sacks by this defense
+                    'sack_fumbles_lost': 'sum',       # fumbles forced
+                    'passing_yards': 'sum',            # pass yards allowed
+                    'rushing_yards': 'sum',            # rush yards allowed
+                    'passing_tds': 'sum',              # pass TDs allowed
+                    'rushing_tds': 'sum',              # rush TDs allowed
                 }
                 d_existing = {k: v for k, v in def_cols.items() if k in tdf.columns}
                 team_col = next((c for c in ['team', 'team_abbr', 'posteam', 'defteam'] if c in tdf.columns), None)
