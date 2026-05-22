@@ -269,7 +269,40 @@ function ExpandedContent({ player, scoring }) {
         </div>
       )}
 
-      {isDef && (
+      {isDef && seasons.length > 0 && (
+        <div>
+          <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500 mb-2">Defensive Stats</div>
+          <div className="overflow-auto border border-slate-800 rounded-md bg-slate-950/40">
+            <table className="pfr-table w-full">
+              <thead><tr>
+                <th>Season</th>
+                <th>Sacks</th>
+                <th>INT</th>
+                <th>FF</th>
+                <th>FR</th>
+                <th>DEF TD</th>
+                <th>Pts Allowed</th>
+                <th>Yds Allowed</th>
+              </tr></thead>
+              <tbody>
+                {seasons.map((s) => (
+                  <tr key={s.season}>
+                    <td className="font-bold text-white">{s.season}</td>
+                    <td className="font-mono-tab">{s.sacks ?? "—"}</td>
+                    <td className="font-mono-tab">{s.interceptions ?? "—"}</td>
+                    <td className="font-mono-tab">{s.fumbles_forced ?? "—"}</td>
+                    <td className="font-mono-tab">{s.fumbles_recovered ?? "—"}</td>
+                    <td className="font-mono-tab">{s.def_tds ?? "—"}</td>
+                    <td className="font-mono-tab">{s.points_allowed ?? "—"}</td>
+                    <td className="font-mono-tab">{s.yards_allowed?.toLocaleString() ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {isDef && seasons.length === 0 && (
         <div className="bg-slate-950/40 border border-slate-800 rounded-md p-4">
           <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500 mb-2">Defense Info</div>
           <p className="text-sm text-slate-400">
