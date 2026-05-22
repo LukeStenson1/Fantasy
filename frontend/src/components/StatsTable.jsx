@@ -307,7 +307,9 @@ function ExpandedContent({ player, scoring }) {
                 <th>FR</th>
                 <th>DEF TD</th>
                 <th>Pts Allowed</th>
-                <th>Yds Allowed</th>
+                <th>Pass Yds</th>
+                <th>Rush Yds</th>
+                <th>Tot Yds</th>
               </tr></thead>
               <tbody>
                 {seasons.map((s) => (
