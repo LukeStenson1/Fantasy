@@ -42,7 +42,7 @@ const COLUMNS_DEF = [
 function getColumns(rows) {
   if (!rows || rows.length === 0) return COLUMNS_SKILL;
   const positions = new Set(rows.map((r) => r.position));
-  if (positions.has("DEF")) return COLUMNS_DEF;
+  if (positions.has("DEF") && positions.size === 1) return COLUMNS_DEF;
   if (positions.has("K") && positions.size === 1) return COLUMNS_K;
   return COLUMNS_SKILL;
 }
