@@ -45,7 +45,7 @@ app = FastAPI(title="Fantasy Lab API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://fantasy(-[a-z0-9]+)*(-lukestenson1s-projects)?\.vercel\.app",
+    allow_origin_regex=r"https://(fantasy(-[a-z0-9]+)*(-lukestenson1s-projects)?\.vercel\.app|fantasylabs\.website|www\.fantasylabs\.website)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
