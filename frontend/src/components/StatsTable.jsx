@@ -319,6 +319,8 @@ function ExpandedContent({ player, scoring }) {
                     <td className="font-mono-tab">{s.fumbles_recovered ?? "—"}</td>
                     <td className="font-mono-tab">{s.def_tds ?? "—"}</td>
                     <td className="font-mono-tab">{s.points_allowed ?? "—"}</td>
+                    <td className="font-mono-tab">{s.pass_yards_allowed?.toLocaleString() ?? "—"}</td>
+                    <td className="font-mono-tab">{s.rush_yards_allowed?.toLocaleString() ?? "—"}</td>
                     <td className="font-mono-tab">{s.yards_allowed?.toLocaleString() ?? "—"}</td>
                   </tr>
                 ))}
