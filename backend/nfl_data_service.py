@@ -108,6 +108,35 @@ def _detect_tag(seasons: list[dict], position: str) -> str | None:
         return None
     seasons_sorted = sorted(seasons, key=lambda s: s["season"])
     latest = seasons_sorted[-1]
+
+    # Kicker tags
+    if position == "K":
+        fppg = latest.get("fpts_per_game_half_ppr", 0)
+        games = latest.get("games", 0)
+        if fppg >= 9.0 and games >= 12:
+            return "elite"
+        if fppg >= 7.0 and games >= 12:
+            return "sleeper"
+        if games > 0 and games < 10:
+            return "risk"
+        if fppg < 5.0 and games >= 10:
+            return "risk"
+        return None
+
+    # DEF tags
+    if position == "DEF":
+        yards = latest.get("yards_allowed", 0)
+        points = latest.get("points_allowed", 0)
+        sacks = latest.get("sacks", 0)
+        ints = latest.get("interceptions", 0)
+        if yards > 0 and yards < 4500 and (sacks + ints) > 50:
+            return "elite"
+        if yards > 6000 or points > 350:
+            return "risk"
+        if (sacks + ints) > 45:
+            return "sleeper"
+        return None
+
     fppg = latest.get("fpts_per_game_half_ppr", 0)
     games = latest.get("games", 0)
     elite_threshold = {"QB": 22, "RB": 17, "WR": 16, "TE": 13}.get(position, 99)
