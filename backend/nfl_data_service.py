@@ -431,7 +431,7 @@ def _fetch_schedule_sync(seasons: Iterable[int]):
         logger.warning(f"Schedule fetch failed: {e}")
     return next_opp
 
-def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict) -> list[dict]:
+def _build_players_from_dataframes(seasonal_dfs: dict, roster_dfs: dict, kicking_dfs: dict | None = None, team_def_dfs: dict | None = None) -> list[dict]:
     import pandas as pd
 
     all_player_seasons: dict[str, dict] = {}
