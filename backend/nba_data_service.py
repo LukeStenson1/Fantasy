@@ -1,0 +1,237 @@
+"""NBA data service using nba_api.
+Fetches player stats, rosters, and schedules for fantasy basketball.
+"""
+from __future__ import annotations
+import asyncio
+import logging
+import uuid
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+logger = logging.getLogger("ffref.nba")
+
+NBA_POSITIONS = {"PG", "SG", "SF", "PF", "C"}
+
+# Fantasy points scoring (standard points league)
+# PTS=1, REB=1.2, AST=1.5, STL=3, BLK=3, TO=-1, 3PM=0.5
+FP_WEIGHTS = {
+    "pts": 1.0,
+    "reb": 1.2,
+    "ast": 1.5,
+    "stl": 3.0,
+    "blk": 3.0,
+    "tov": -1.0,
+    "fg3m": 0.5,
+}
+
+NBA_TEAMS = [
+    ("ATL", "Atlanta Hawks"), ("BOS", "Boston Celtics"), ("BKN", "Brooklyn Nets"),
+    ("CHA", "Charlotte Hornets"), ("CHI", "Chicago Bulls"), ("CLE", "Cleveland Cavaliers"),
+    ("DAL", "Dallas Mavericks"), ("DEN", "Denver Nuggets"), ("DET", "Detroit Pistons"),
+    ("GSW", "Golden State Warriors"), ("HOU", "Houston Rockets"), ("IND", "Indiana Pacers"),
+    ("LAC", "LA Clippers"), ("LAL", "Los Angeles Lakers"), ("MEM", "Memphis Grizzlies"),
+    ("MIA", "Miami Heat"), ("MIL", "Milwaukee Bucks"), ("MIN", "Minnesota Timberwolves"),
+    ("NOP", "New Orleans Pelicans"), ("NYK", "New York Knicks"), ("OKC", "Oklahoma City Thunder"),
+    ("ORL", "Orlando Magic"), ("PHI", "Philadelphia 76ers"), ("PHX", "Phoenix Suns"),
+    ("POR", "Portland Trail Blazers"), ("SAC", "Sacramento Kings"), ("SAS", "San Antonio Spurs"),
+    ("TOR", "Toronto Raptors"), ("UTA", "Utah Jazz"), ("WAS", "Washington Wizards"),
+]
+
+# Map full team names to abbreviations
+TEAM_NAME_TO_ABV = {name: abv for abv, name in NBA_TEAMS}
+TEAM_ABV_TO_NAME = {abv: name for abv, name in NBA_TEAMS}
+
+def _compute_fpts(row: dict) -> float:
+    pts = (row.get("pts") or 0) * FP_WEIGHTS["pts"]
+    reb = (row.get("reb") or 0) * FP_WEIGHTS["reb"]
+    ast = (row.get("ast") or 0) * FP_WEIGHTS["ast"]
+    stl = (row.get("stl") or 0) * FP_WEIGHTS["stl"]
+    blk = (row.get("blk") or 0) * FP_WEIGHTS["blk"]
+    tov = (row.get("tov") or 0) * FP_WEIGHTS["tov"]
+    fg3m = (row.get("fg3m") or 0) * FP_WEIGHTS["fg3m"]
+    return round(pts + reb + ast + stl + blk + tov + fg3m, 2)
+
+def _detect_nba_tag(seasons: list[dict], position: str) -> str | None:
+    if not seasons:
+        return None
+    seasons_sorted = sorted(seasons, key=lambda s: s["season"])
+    latest = seasons_sorted[-1]
+    fppg = latest.get("fpts_per_game", 0)
+    games = latest.get("games", 0)
+
+    elite_threshold = {"PG": 45, "SG": 38, "SF": 36, "PF": 36, "C": 38}.get(position, 40)
+    breakout_threshold = {"PG": 35, "SG": 30, "SF": 28, "PF": 28, "C": 30}.get(position, 30)
+
+    if fppg >= elite_threshold and games >= 50:
+        return "elite"
+    if len(seasons_sorted) >= 2:
+        prev = seasons_sorted[-2]
+        if (
+            fppg >= breakout_threshold
+            and prev.get("fpts_per_game", 0) < breakout_threshold - 5
+            and games >= 40
+        ):
+            return "breakout"
+    if games > 0 and games < 30:
+        return "risk"
+    if fppg >= breakout_threshold - 5 and games <= 50 and len(seasons_sorted) <= 2:
+        return "sleeper"
+    return None
+
+def _get_current_nba_season() -> str:
+    """Returns current NBA season in YYYY-YY format e.g. 2025-26"""
+    now = datetime.now(timezone.utc)
+    year = now.year
+    month = now.month
+    # NBA season starts in October
+    if month >= 10:
+        return f"{year}-{str(year + 1)[-2:]}"
+    else:
+        return f"{year - 1}-{str(year)[-2:]}"
+
+def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
+    """Fetch NBA player stats using nba_api."""
+    try:
+        from nba_api.stats.endpoints import leaguedashplayerstats, commonallplayers
+        from nba_api.stats.static import players as nba_players_static
+        import pandas as pd
+        import time
+    except ImportError:
+        logger.error("nba_api not installed")
+        return []
+
+    current_season = _get_current_nba_season()
+    season_year = int(current_season.split("-")[0])
+    seasons = [f"{season_year - i}-{str(season_year - i + 1)[-2:]}" for i in range(seasons_back)]
+    seasons = [current_season] + [s for s in seasons if s != current_season]
+
+    all_player_seasons: dict[str, dict] = {}
+
+    for season in seasons:
+        try:
+            logger.info(f"Fetching NBA season {season}...")
+            time.sleep(1)  # Rate limit
+            stats = leaguedashplayerstats.LeagueDashPlayerStats(
+                season=season,
+                season_type_all_star="Regular Season",
+                per_mode_simple="PerGame",
+            )
+            df = stats.get_data_frames()[0]
+            if df is None or df.empty:
+                logger.warning(f"No NBA data for season {season}")
+                continue
+
+            logger.info(f"Fetched NBA {season}: {len(df)} players")
+
+            for _, row in df.iterrows():
+                pid = str(row.get("PLAYER_ID", ""))
+                if not pid:
+                    continue
+
+                name = row.get("PLAYER_NAME", "")
+                team_abv = row.get("TEAM_ABBREVIATION", "")
+                pos = str(row.get("START_POSITION", "") or "").strip()
+                games = int(row.get("GP", 0) or 0)
+
+                if games < 5:
+                    continue
+
+                # Map position
+                if not pos or pos not in NBA_POSITIONS:
+                    pos = "SF"  # Default
+
+                season_rec = {
+                    "season": season,
+                    "games": games,
+                    "pts": round(float(row.get("PTS", 0) or 0), 1),
+                    "reb": round(float(row.get("REB", 0) or 0), 1),
+                    "ast": round(float(row.get("AST", 0) or 0), 1),
+                    "stl": round(float(row.get("STL", 0) or 0), 1),
+                    "blk": round(float(row.get("BLK", 0) or 0), 1),
+                    "tov": round(float(row.get("TOV", 0) or 0), 1),
+                    "fg3m": round(float(row.get("FG3M", 0) or 0), 1),
+                    "fg_pct": round(float(row.get("FG_PCT", 0) or 0) * 100, 1),
+                    "ft_pct": round(float(row.get("FT_PCT", 0) or 0) * 100, 1),
+                    "min": round(float(row.get("MIN", 0) or 0), 1),
+                }
+                season_rec["fpts"] = _compute_fpts(season_rec)
+                season_rec["fpts_per_game"] = season_rec["fpts"]
+
+                if pid not in all_player_seasons:
+                    all_player_seasons[pid] = {
+                        "ext_id": f"NBA_{pid}",
+                        "name": str(name),
+                        "position": pos,
+                        "team": team_abv,
+                        "seasons": [],
+                        "sport": "nba",
+                    }
+                else:
+                    # Update team to latest
+                    all_player_seasons[pid]["team"] = team_abv
+
+                all_player_seasons[pid]["seasons"].append(season_rec)
+
+        except Exception as e:
+            logger.warning(f"NBA season {season} fetch failed: {e}")
+            continue
+
+    # Build final player list
+    final = []
+    for pid, entry in all_player_seasons.items():
+        seasons_sorted = sorted(entry["seasons"], key=lambda s: s["season"])
+        latest = seasons_sorted[-1] if seasons_sorted else {}
+        tag = _detect_nba_tag(seasons_sorted, entry["position"])
+
+        final.append({
+            "id": str(uuid.uuid4()),
+            "ext_id": entry["ext_id"],
+            "name": entry["name"],
+            "position": entry["position"],
+            "team": entry["team"],
+            "sport": "nba",
+            "age": None,
+            "experience": len(seasons_sorted),
+            "headshot": "",
+            "tag": tag,
+            "rookie_info": None,
+            "seasons": seasons_sorted,
+            "news": [],
+            "current_fpts": latest.get("fpts_per_game", 0),
+            "current_fpts_per_game": latest.get("fpts_per_game", 0),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    logger.info(f"NBA players built: {len(final)}")
+    return final
+
+
+async def refresh_nba_data(db, *, force: bool = False) -> dict:
+    """Refresh NBA player data."""
+    if not force:
+        meta = await db.meta.find_one({"key": "last_nba_refresh"}, {"_id": 0})
+        if meta:
+            last = datetime.fromisoformat(meta["value"])
+            if datetime.now(timezone.utc) - last < timedelta(hours=24):
+                count = await db.players.count_documents({"sport": "nba"})
+                if count > 0:
+                    return {"status": "skipped", "reason": "fresh", "players": count}
+
+    loop = asyncio.get_event_loop()
+    players = await loop.run_in_executor(None, _fetch_nba_players_sync)
+
+    if not players:
+        return {"status": "error", "reason": "no_nba_data"}
+
+    # Delete old NBA players and reinsert
+    await db.players.delete_many({"sport": "nba"})
+    await db.players.insert_many(players)
+
+    await db.meta.replace_one(
+        {"key": "last_nba_refresh"},
+        {"key": "last_nba_refresh", "value": datetime.now(timezone.utc).isoformat(), "count": len(players)},
+        upsert=True,
+    )
+
+    return {"status": "ok", "players": len(players)}
