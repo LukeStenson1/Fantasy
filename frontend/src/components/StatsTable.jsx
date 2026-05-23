@@ -191,6 +191,7 @@ export default function StatsTable({ rows, scoring, sport = "nfl" }) {
               onToggle={() => setExpandedId(expandedId === p.id ? null : p.id)}
               scoring={scoring}
               columns={columns}
+              sport={sport}
             />
           ))}
         </tbody>
