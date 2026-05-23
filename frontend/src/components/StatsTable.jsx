@@ -129,12 +129,12 @@ function getValue(p, col) {
   return p[col.key];
 }
 
-export default function StatsTable({ rows, scoring }) {
+export default function StatsTable({ rows, scoring, sport = "nfl" }) {
   const [sortKey, setSortKey] = useState("current_fpts");
   const [dir, setDir] = useState("desc");
   const [expandedId, setExpandedId] = useState(null);
 
-  const columns = useMemo(() => getColumns(rows), [rows]);
+  const columns = useMemo(() => getColumns(rows, sport), [rows, sport]);
 
   const sorted = useMemo(() => {
     const arr = [...rows];
