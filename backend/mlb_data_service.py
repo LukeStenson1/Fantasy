@@ -94,7 +94,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
 
             for _, row in df.iterrows():
                 name = str(row.get("Name", "") or "")
-                team = str(row.get("Team", "") or "")
+                team = str(row.get("Tm", "") or "")
                 pos = str(row.get("Pos", "") or "").strip().upper()
                 games = int(row.get("G", 0) or 0)
                 pid = f"BAT_{name.replace(' ', '_')}_{team}"
