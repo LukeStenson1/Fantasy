@@ -1077,6 +1077,21 @@ async def refresh_player_data(db, *, seasons: list[int] | None = None, force: bo
             {"key": "next_opp", "value": next_opp, "updated_at": datetime.now(timezone.utc).isoformat()},
             upsert=True,
         )
+    # Also refresh NBA and MLB on force refresh
+    if force:
+        try:
+            from .nba_data_service import refresh_nba_data
+            nba_result = await refresh_nba_data(db, force=True)
+            logger.info(f"NBA refresh: {nba_result}")
+        except Exception as e:
+            logger.warning(f"NBA refresh failed: {e}")
+        try:
+            from .mlb_data_service import refresh_mlb_data
+            mlb_result = await refresh_mlb_data(db, force=True)
+            logger.info(f"MLB refresh: {mlb_result}")
+        except Exception as e:
+            logger.warning(f"MLB refresh failed: {e}")
+
     # Refresh ESPN news
     try:
         from .espn_injuries import refresh_news, _fetch_news_sync
