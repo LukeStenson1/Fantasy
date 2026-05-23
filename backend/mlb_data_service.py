@@ -72,7 +72,7 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
 def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
     """Fetch MLB player stats using pybaseball."""
     try:
-        from pybaseball import batting_stats, pitching_stats
+        from pybaseball import batting_stats_bref as batting_stats, pitching_stats_bref as pitching_stats
         import pandas as pd
     except ImportError:
         logger.error("pybaseball not installed")
