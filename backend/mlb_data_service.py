@@ -77,9 +77,26 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
         from pybaseball import cache
         cache.enable()
         import pandas as pd
+        import math
     except ImportError:
         logger.error("pybaseball not installed")
         return []
+
+    def safe_int(v):
+        try:
+            if v is None or (isinstance(v, float) and math.isnan(v)):
+                return 0
+            return int(v)
+        except Exception:
+            return 0
+
+    def safe_float(v, decimals=2):
+        try:
+            if v is None or (isinstance(v, float) and math.isnan(v)):
+                return 0.0
+            return round(float(v), decimals)
+        except Exception:
+            return 0.0
 
     current_year = datetime.now(timezone.utc).year
     seasons = list(range(current_year - seasons_back + 1, current_year + 1))
@@ -91,7 +108,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
         try:
             df = batting_stats(season)
             if df is not None and not df.empty:
-                df = df[df["G"] >= 20]  # Filter manually
+                df = df[df["G"] >= 20]
             if df is None or df.empty:
                 logger.warning(f"No MLB batting data for {season}")
                 continue
@@ -101,10 +118,9 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 name = str(row.get("Name", "") or "")
                 team = str(row.get("Tm", "") or "")
                 pos = str(row.get("Pos", "") or "").strip().upper()
-                games = int(row.get("G", 0) or 0)
+                games = safe_int(row.get("G"))
                 pid = f"BAT_{name.replace(' ', '_')}_{team}"
 
-                # Normalize position
                 if "C" in pos:
                     pos = "C"
                 elif "1B" in pos:
@@ -120,39 +136,21 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 else:
                     pos = "OF"
 
-                def safe_int(v):
-                    try:
-                        import math
-                        if v is None or (isinstance(v, float) and math.isnan(v)):
-                            return 0
-                        return int(v)
-                    except Exception:
-                        return 0
-
-                def safe_float(v, decimals=2):
-                    try:
-                        import math
-                        if v is None or (isinstance(v, float) and math.isnan(v)):
-                            return 0.0
-                        return round(float(v), decimals)
-                    except Exception:
-                        return 0.0
-
                 season_rec = {
                     "season": season,
                     "G": games,
-                    "GS": gs,
-                    "IP": safe_float(ip_raw, 1),
-                    "W": safe_int(row.get("W")),
-                    "L": safe_int(row.get("L")),
-                    "SV": safe_int(row.get("SV")),
-                    "SO": safe_int(row.get("SO")),
-                    "BB": safe_int(row.get("BB")),
+                    "AB": safe_int(row.get("AB")),
                     "H": safe_int(row.get("H")),
-                    "ER": safe_int(row.get("ER")),
-                    "ERA": safe_float(row.get("ERA")),
-                    "WHIP": safe_float(row.get("WHIP")),
-                    "K9": safe_float(row.get("K/9"), 1),
+                    "R": safe_int(row.get("R")),
+                    "HR": safe_int(row.get("HR")),
+                    "RBI": safe_int(row.get("RBI")),
+                    "SB": safe_int(row.get("SB")),
+                    "BB": safe_int(row.get("BB")),
+                    "SO": safe_int(row.get("SO")),
+                    "AVG": safe_float(row.get("BA"), 3),
+                    "OBP": safe_float(row.get("OBP"), 3),
+                    "SLG": safe_float(row.get("SLG"), 3),
+                    "OPS": safe_float(row.get("OPS"), 3),
                 }
                 fpts = _compute_batter_fpts(season_rec)
                 season_rec["fpts"] = fpts
@@ -181,7 +179,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
         try:
             df = pitching_stats(season)
             if df is not None and not df.empty:
-                df = df[df["G"] >= 5]  # Filter manually
+                df = df[df["G"] >= 5]
             if df is None or df.empty:
                 logger.warning(f"No MLB pitching data for {season}")
                 continue
@@ -190,16 +188,17 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
             for _, row in df.iterrows():
                 name = str(row.get("Name", "") or "")
                 team = str(row.get("Team", "") or "")
-                games = int(row.get("G", 0) or 0)
-                gs = int(row.get("GS", 0) or 0)
+                games = safe_int(row.get("G"))
+                gs = safe_int(row.get("GS"))
                 pid = f"PIT_{name.replace(' ', '_')}_{team}"
 
-                # SP if more than half games are starts
                 pos = "SP" if gs >= games * 0.5 else "RP"
 
                 ip_raw = row.get("IP", 0) or 0
                 try:
                     ip = float(ip_raw)
+                    if math.isnan(ip):
+                        ip = 0.0
                 except Exception:
                     ip = 0.0
 
@@ -208,16 +207,16 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                     "G": games,
                     "GS": gs,
                     "IP": round(ip, 1),
-                    "W": int(row.get("W", 0) or 0),
-                    "L": int(row.get("L", 0) or 0),
-                    "SV": int(row.get("SV", 0) or 0),
-                    "SO": int(row.get("SO", 0) or 0),
-                    "BB": int(row.get("BB", 0) or 0),
-                    "H": int(row.get("H", 0) or 0),
-                    "ER": int(row.get("ER", 0) or 0),
-                    "ERA": round(float(row.get("ERA", 0) or 0), 2),
-                    "WHIP": round(float(row.get("WHIP", 0) or 0), 2),
-                    "K9": round(float(row.get("K/9", 0) or 0), 1),
+                    "W": safe_int(row.get("W")),
+                    "L": safe_int(row.get("L")),
+                    "SV": safe_int(row.get("SV")),
+                    "SO": safe_int(row.get("SO")),
+                    "BB": safe_int(row.get("BB")),
+                    "H": safe_int(row.get("H")),
+                    "ER": safe_int(row.get("ER")),
+                    "ERA": safe_float(row.get("ERA")),
+                    "WHIP": safe_float(row.get("WHIP")),
+                    "K9": safe_float(row.get("SO9"), 1),
                 }
                 fpts = _compute_pitcher_fpts(season_rec)
                 season_rec["fpts"] = fpts
