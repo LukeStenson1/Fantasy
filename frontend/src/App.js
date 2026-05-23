@@ -10,12 +10,14 @@ import Stats from "./pages/Stats";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MyRankings from "./pages/MyRankings";
+import { SportProvider } from "./contexts/SportContext";
 import "./App.css";
 
 function App() {
   return (
     <div className="App">
       <AuthProvider>
+        <SportProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -33,7 +35,8 @@ function App() {
           </Routes>
           <Toaster position="top-right" theme="dark" />
         </BrowserRouter>
-      </AuthProvider>
+      </SportProvider>
+    </AuthProvider>
     </div>
   );
 }
