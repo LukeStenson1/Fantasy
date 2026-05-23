@@ -114,7 +114,7 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
             stats = leaguedashplayerstats.LeagueDashPlayerStats(
                 season=season,
                 season_type_all_star="Regular Season",
-                per_mode_simple="PerGame",
+                per_mode_detailed="PerGame",
             )
             df = stats.get_data_frames()[0]
             if df is None or df.empty:
