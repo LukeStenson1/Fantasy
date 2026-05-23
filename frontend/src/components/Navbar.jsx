@@ -1,10 +1,18 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSport } from "../contexts/SportContext";
 import { Button } from "./ui/button";
 import { LogOut, User as UserIcon } from "lucide-react";
 
+const SPORTS = [
+  { id: "nfl", label: "NFL" },
+  { id: "nba", label: "NBA" },
+  { id: "mlb", label: "MLB" },
+];
+
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { sport, setSport } = useSport();
   const navigate = useNavigate();
 
   const linkBase = "text-xs font-bold tracking-[0.15em] uppercase px-3 py-2 transition-colors";
@@ -14,9 +22,9 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-30 bg-[#0a0e16]/95 backdrop-blur-md border-b border-slate-800" data-testid="navbar">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+        {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group" data-testid="navbar-logo">
           <div className="relative w-9 h-9 flex items-center justify-center">
-            {/* FL logo: black square with emerald accent corner */}
             <div className="absolute inset-0 bg-emerald-500 rotate-[3deg] group-hover:rotate-[6deg] transition-transform"></div>
             <div className="absolute inset-0 bg-slate-950 border border-emerald-500/60"></div>
             <span className="relative font-display font-black text-base text-emerald-400 tracking-tight">FL</span>
@@ -26,6 +34,24 @@ export default function Navbar() {
           </div>
         </Link>
 
+        {/* Sport switcher */}
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg p-1">
+          {SPORTS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSport(s.id)}
+              className={`px-3 py-1 text-xs font-bold tracking-widest uppercase rounded-md transition-all ${
+                sport === s.id
+                  ? "bg-emerald-500 text-slate-950"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Nav links */}
         <nav className="hidden md:flex items-center gap-1">
           <NavLink to="/lineup" className={linkClass} data-testid="nav-lineup">Lineup</NavLink>
           <NavLink to="/trades" className={linkClass} data-testid="nav-trades">Trades</NavLink>
@@ -36,6 +62,7 @@ export default function Navbar() {
           )}
         </nav>
 
+        {/* Auth */}
         <div className="flex items-center gap-2">
           {user && user !== false ? (
             <>
