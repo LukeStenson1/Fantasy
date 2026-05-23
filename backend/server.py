@@ -161,19 +161,25 @@ async def refresh_token_ep(request: Request, response: Response):
         raise HTTPException(401, f"Invalid refresh token: {e}")
 
 
-# ---------- Player Stats ----------
-def _attach_current_season(p: dict, season: Optional[int], scoring: str):
-    seasons = p.get("seasons", [])
-    cur = None
-    if season is not None:
-        # Strict: only return the row for that season; if absent, leave None so caller filters out
-        cur = next((s for s in seasons if s.get("season") == season), None)
-    elif seasons:
-        cur = max(seasons, key=lambda s: s.get("season", 0))
-    p["current_season"] = cur
-    if cur:
-        p["current_fpts"] = cur.get(f"fpts_{scoring}", 0)
-        p["current_fpts_per_game"] = cur.get(f"fpts_per_game_{scoring}", 0)
+def _attach_current_season(p: dict, season, scoring: str) -> dict:
+    seasons = p.get("seasons") or []
+    sport = p.get("sport", "nfl")
+    if not seasons:
+        p["current_season"] = None
+        p["current_fpts"] = 0
+        p["current_fpts_per_game"] = 0
+        return p
+    if season:
+        match = next((s for s in seasons if str(s.get("season", "")) == str(season)), None) or seasons[-1]
+    else:
+        match = seasons[-1]
+    p["current_season"] = match
+    if sport == "nfl":
+        p["current_fpts"] = match.get(f"fpts_{scoring}", 0) or 0
+        p["current_fpts_per_game"] = match.get(f"fpts_per_game_{scoring}", 0) or 0
+    else:
+        p["current_fpts"] = match.get("fpts", 0) or 0
+        p["current_fpts_per_game"] = match.get("fpts_per_game", 0) or 0
     return p
 
 
