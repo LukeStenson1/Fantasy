@@ -54,6 +54,56 @@ const COLUMNS_DEF = [
   { key: "matchup_score", label: "Matchup", sortable: false },
 ];
 
+const COLUMNS_NBA = [
+  { key: "name", label: "Player", sortable: true },
+  { key: "position", label: "Pos", sortable: true },
+  { key: "team", label: "Tm", sortable: true },
+  { key: "season", label: "Yr", sortable: true, fromCurrent: true, type: "num" },
+  { key: "games", label: "G", sortable: true, fromCurrent: true, type: "num" },
+  { key: "pts", label: "PTS", sortable: true, fromCurrent: true, type: "num" },
+  { key: "reb", label: "REB", sortable: true, fromCurrent: true, type: "num" },
+  { key: "ast", label: "AST", sortable: true, fromCurrent: true, type: "num" },
+  { key: "stl", label: "STL", sortable: true, fromCurrent: true, type: "num" },
+  { key: "blk", label: "BLK", sortable: true, fromCurrent: true, type: "num" },
+  { key: "tov", label: "TO", sortable: true, fromCurrent: true, type: "num" },
+  { key: "fg3m", label: "3PM", sortable: true, fromCurrent: true, type: "num" },
+  { key: "current_fpts", label: "FPts", sortable: true, type: "num", emphasize: true },
+  { key: "current_fpts_per_game", label: "FPts/G", sortable: true, type: "num", emphasize: true },
+];
+
+const COLUMNS_MLB_BATTER = [
+  { key: "name", label: "Player", sortable: true },
+  { key: "position", label: "Pos", sortable: true },
+  { key: "team", label: "Tm", sortable: true },
+  { key: "season", label: "Yr", sortable: true, fromCurrent: true, type: "num" },
+  { key: "G", label: "G", sortable: true, fromCurrent: true, type: "num" },
+  { key: "H", label: "H", sortable: true, fromCurrent: true, type: "num" },
+  { key: "R", label: "R", sortable: true, fromCurrent: true, type: "num" },
+  { key: "HR", label: "HR", sortable: true, fromCurrent: true, type: "num" },
+  { key: "RBI", label: "RBI", sortable: true, fromCurrent: true, type: "num" },
+  { key: "SB", label: "SB", sortable: true, fromCurrent: true, type: "num" },
+  { key: "AVG", label: "AVG", sortable: true, fromCurrent: true, type: "num" },
+  { key: "OPS", label: "OPS", sortable: true, fromCurrent: true, type: "num" },
+  { key: "current_fpts", label: "FPts", sortable: true, type: "num", emphasize: true },
+  { key: "current_fpts_per_game", label: "FPts/G", sortable: true, type: "num", emphasize: true },
+];
+
+const COLUMNS_MLB_PITCHER = [
+  { key: "name", label: "Player", sortable: true },
+  { key: "position", label: "Pos", sortable: true },
+  { key: "team", label: "Tm", sortable: true },
+  { key: "season", label: "Yr", sortable: true, fromCurrent: true, type: "num" },
+  { key: "G", label: "G", sortable: true, fromCurrent: true, type: "num" },
+  { key: "IP", label: "IP", sortable: true, fromCurrent: true, type: "num" },
+  { key: "W", label: "W", sortable: true, fromCurrent: true, type: "num" },
+  { key: "SV", label: "SV", sortable: true, fromCurrent: true, type: "num" },
+  { key: "SO", label: "K", sortable: true, fromCurrent: true, type: "num" },
+  { key: "ERA", label: "ERA", sortable: true, fromCurrent: true, type: "num" },
+  { key: "WHIP", label: "WHIP", sortable: true, fromCurrent: true, type: "num" },
+  { key: "current_fpts", label: "FPts", sortable: true, type: "num", emphasize: true },
+  { key: "current_fpts_per_game", label: "FPts/G", sortable: true, type: "num", emphasize: true },
+];
+
 function getColumns(rows) {
   if (!rows || rows.length === 0) return COLUMNS_SKILL;
   const positions = new Set(rows.map((r) => r.position));
