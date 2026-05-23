@@ -104,8 +104,17 @@ const COLUMNS_MLB_PITCHER = [
   { key: "current_fpts_per_game", label: "FPts/G", sortable: true, type: "num", emphasize: true },
 ];
 
-function getColumns(rows) {
-  if (!rows || rows.length === 0) return COLUMNS_SKILL;
+function getColumns(rows, sport) {
+  if (!rows || rows.length === 0) return sport === "nba" ? COLUMNS_NBA : COLUMNS_SKILL;
+  if (sport === "nba") return COLUMNS_NBA;
+  if (sport === "mlb") {
+    const positions = new Set(rows.map(r => r.position));
+    const hasPitcher = positions.has("SP") || positions.has("RP");
+    const hasBatter = positions.has("C") || positions.has("1B") || positions.has("2B") ||
+      positions.has("3B") || positions.has("SS") || positions.has("OF") || positions.has("DH");
+    if (hasPitcher && !hasBatter) return COLUMNS_MLB_PITCHER;
+    return COLUMNS_MLB_BATTER;
+  }
   const positions = new Set(rows.map((r) => r.position));
   if (positions.has("DEF") && positions.size === 1) return COLUMNS_DEF;
   if (positions.has("K") && positions.size === 1) return COLUMNS_K;
