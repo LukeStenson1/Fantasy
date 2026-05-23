@@ -120,21 +120,39 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 else:
                     pos = "OF"
 
+                def safe_int(v):
+                    try:
+                        import math
+                        if v is None or (isinstance(v, float) and math.isnan(v)):
+                            return 0
+                        return int(v)
+                    except Exception:
+                        return 0
+
+                def safe_float(v, decimals=2):
+                    try:
+                        import math
+                        if v is None or (isinstance(v, float) and math.isnan(v)):
+                            return 0.0
+                        return round(float(v), decimals)
+                    except Exception:
+                        return 0.0
+
                 season_rec = {
                     "season": season,
                     "G": games,
-                    "AB": int(row.get("AB", 0) or 0),
-                    "H": int(row.get("H", 0) or 0),
-                    "R": int(row.get("R", 0) or 0),
-                    "HR": int(row.get("HR", 0) or 0),
-                    "RBI": int(row.get("RBI", 0) or 0),
-                    "SB": int(row.get("SB", 0) or 0),
-                    "BB": int(row.get("BB", 0) or 0),
-                    "SO": int(row.get("SO", 0) or 0),
-                    "AVG": round(float(row.get("AVG", 0) or 0), 3),
-                    "OBP": round(float(row.get("OBP", 0) or 0), 3),
-                    "SLG": round(float(row.get("SLG", 0) or 0), 3),
-                    "OPS": round(float(row.get("OPS", 0) or 0), 3),
+                    "GS": gs,
+                    "IP": safe_float(ip_raw, 1),
+                    "W": safe_int(row.get("W")),
+                    "L": safe_int(row.get("L")),
+                    "SV": safe_int(row.get("SV")),
+                    "SO": safe_int(row.get("SO")),
+                    "BB": safe_int(row.get("BB")),
+                    "H": safe_int(row.get("H")),
+                    "ER": safe_int(row.get("ER")),
+                    "ERA": safe_float(row.get("ERA")),
+                    "WHIP": safe_float(row.get("WHIP")),
+                    "K9": safe_float(row.get("K/9"), 1),
                 }
                 fpts = _compute_batter_fpts(season_rec)
                 season_rec["fpts"] = fpts
