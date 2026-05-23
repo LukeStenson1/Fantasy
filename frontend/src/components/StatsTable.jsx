@@ -249,7 +249,7 @@ function PlayerRow({ player, expanded, onToggle, scoring, columns, sport }) {
   );
 }
 
-function ExpandedContent({ player, scoring }) {
+function ExpandedContent({ player, scoring, sport = "nfl" }) {
   const [full, setFull] = useState(null);
   const [outlook, setOutlook] = useState(null);
   const [loadingOutlook, setLoadingOutlook] = useState(false);
