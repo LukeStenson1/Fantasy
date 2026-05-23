@@ -200,7 +200,7 @@ export default function StatsTable({ rows, scoring, sport = "nfl" }) {
   );
 }
 
-function PlayerRow({ player, expanded, onToggle, scoring, columns }) {
+function PlayerRow({ player, expanded, onToggle, scoring, columns, sport }) {
   const p = player;
   return (
     <>
