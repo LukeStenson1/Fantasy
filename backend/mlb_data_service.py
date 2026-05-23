@@ -161,7 +161,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
     # ── Pitchers ──
     for season in seasons:
         try:
-            df = pitching_stats(season, season)
+            df = pitching_stats(season)
             if df is not None and not df.empty:
                 df = df[df["G"] >= 5]  # Filter manually
             if df is None or df.empty:
