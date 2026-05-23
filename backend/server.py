@@ -1154,6 +1154,23 @@ async def refresh_injuries_ep(request: Request):
         raise HTTPException(403, "Admin only")
     return await refresh_injuries(db)
 
+@api.post("/admin/refresh-nba")
+async def refresh_nba(request: Request, force: bool = False):
+    user = await require_user(request, db)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    from .nba_data_service import refresh_nba_data
+    result = await refresh_nba_data(db, force=force)
+    return result
+
+@api.post("/admin/refresh-mlb")
+async def refresh_mlb(request: Request, force: bool = False):
+    user = await require_user(request, db)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    from .mlb_data_service import refresh_mlb_data
+    result = await refresh_mlb_data(db, force=force)
+    return result
 
 @api.post("/admin/refresh-data")
 async def refresh_data(request: Request, force: bool = True):
