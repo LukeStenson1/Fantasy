@@ -187,7 +187,7 @@ def _attach_current_season(p: dict, season, scoring: str) -> dict:
 async def list_players(
     position: Optional[str] = None,
     team: Optional[str] = None,
-    season: Optional[int] = None,
+    season: Optional[str] = None,
     scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr",
     search: Optional[str] = None,
     sort: str = "current_fpts",
