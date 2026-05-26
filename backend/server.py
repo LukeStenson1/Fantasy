@@ -200,7 +200,7 @@ async def list_players(
     if sport and sport != "nfl":
         q["sport"] = sport
     else:
-        q["sport"] = {"$in": ["nfl", None]}
+        q["$or"] = [{"sport": "nfl"}, {"sport": {"$exists": False}}, {"sport": None}]
     if position and position != "ALL":
         q["position"] = position
     if team and team != "ALL":
