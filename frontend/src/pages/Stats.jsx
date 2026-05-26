@@ -84,7 +84,7 @@ export default function Stats() {
         .finally(() => setLoading(false));
     }, 150);
     return () => clearTimeout(t);
-  }, [params]);
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
     setPosition("ALL");
