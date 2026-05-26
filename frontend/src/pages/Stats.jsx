@@ -59,12 +59,11 @@ export default function Stats() {
   const positions = sport === "nba" ? NBA_POSITIONS : sport === "mlb" ? MLB_POSITIONS : NFL_POSITIONS;
   const seasons = sport === "nba" ? NBA_SEASONS : sport === "mlb" ? MLB_SEASONS : NFL_SEASONS;
 
-  // Load teams
   useEffect(() => {
     api.get("/teams", { params: { sport } })
       .then((r) => setTeams(r.data || []))
       .catch(() => setTeams([]));
-  }, [sport]);
+  }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const params = useMemo(() => ({
     position,
