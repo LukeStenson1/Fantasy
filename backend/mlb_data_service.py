@@ -125,7 +125,9 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 games = safe_int(row.get("G"))
                 pid = f"BAT_{name.replace(' ', '_')}_{team}"
 
-                if "C" in pos:
+                if "DH" in pos:
+                    pos = "DH"
+                elif "C" in pos and "1B" not in pos:
                     pos = "C"
                 elif "1B" in pos:
                     pos = "1B"
@@ -135,8 +137,6 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                     pos = "3B"
                 elif "SS" in pos:
                     pos = "SS"
-                elif "DH" in pos:
-                    pos = "DH"
                 else:
                     pos = "OF"
 
