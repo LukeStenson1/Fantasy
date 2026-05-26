@@ -81,26 +81,33 @@ export default function MyRankings() {
   };
 
   const forceRefresh = async () => {
-  setRefreshing(true);
-  try {
-    const response = await api.post("/admin/refresh-data", null, { params: { force: true } });
-    const data = response.data;
-    console.log("Refresh response:", data);
-    if (data.status === "ok") {
-      toast.success(`Data refreshed — ${data.players} players, seasons ${(data.seasons || []).join(", ")}`);
-    } else if (data.status === "skipped") {
-      toast.info(`Skipped — data is fresh (${data.players} players)`);
-    } else {
-      toast.error(`Refresh returned: ${JSON.stringify(data)}`);
+    setRefreshing(true);
+    toast.info("Refresh started — this takes 2-3 minutes for all sports...");
+    try {
+      const response = await api.post("/admin/refresh-data", null, {
+        params: { force: true },
+        timeout: 300000, // 5 minute timeout
+      });
+      const data = response.data;
+      if (data.status === "ok") {
+        toast.success(`Data refreshed — ${data.players} NFL players updated`);
+      } else if (data.status === "skipped") {
+        toast.info(`Skipped — data is fresh (${data.players} players)`);
+      } else {
+        toast.error(`Refresh returned: ${JSON.stringify(data)}`);
+      }
+      api.get("/admin/data-status").then((r) => setDataStatus(r.data));
+    } catch (e) {
+      console.error("Refresh error:", e);
+      if (e.code === "ECONNABORTED" || e.message?.includes("timeout")) {
+        toast.success("Refresh is running in the background — check back in a few minutes!");
+      } else {
+        toast.error(`Refresh failed: ${e.message}`);
+      }
+    } finally {
+      setRefreshing(false);
     }
-    api.get("/admin/data-status").then((r) => setDataStatus(r.data));
-  } catch (e) {
-    console.error("Refresh error:", e);
-    toast.error(`Refresh failed: ${e.message}`);
-  } finally {
-    setRefreshing(false);
-  }
-};
+  };
 
   const refreshInjuries = async () => {
     setRefreshing(true);
