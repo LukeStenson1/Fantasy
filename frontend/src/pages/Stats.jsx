@@ -39,7 +39,7 @@ export default function Stats() {
   const { sport } = useSport();
   const [position, setPosition] = useState("ALL");
   const [team, setTeam] = useState("ALL");
-  const [season, setSeason] = useState("");
+  const [season, setSeason] = useState(String(new Date().getFullYear() - 1));
   const [scoring, setScoring] = useState("half_ppr");
   const [search, setSearch] = useState("");
   const [teams, setTeams] = useState([]);
