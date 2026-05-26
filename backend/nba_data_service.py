@@ -102,15 +102,43 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
 
     current_season = _get_current_nba_season()
     season_year = int(current_season.split("-")[0])
-    seasons = [f"{season_year - i}-{str(season_year - i + 1)[-2:]}" for i in range(seasons_back)]
-    seasons = [current_season] + [s for s in seasons if s != current_season]
+    seasons = [current_season] + [
+        f"{season_year - i}-{str(season_year - i + 1)[-2:]}"
+        for i in range(1, seasons_back)
+    ]
+
+    # Build position lookup from static player data
+    pos_lookup = {}
+    try:
+        all_players = nba_players_static.get_active_players()
+        # nba_api static doesn't have position — use commonallplayers
+        time.sleep(0.6)
+        cap = commonallplayers.CommonAllPlayers(is_only_current_season=0)
+        cap_df = cap.get_data_frames()[0]
+        for _, row in cap_df.iterrows():
+            pid = str(row.get("PERSON_ID", ""))
+            pos = str(row.get("POSITION", "") or "").strip()
+            if pid and pos:
+                # Map full position names to abbreviations
+                if "Guard" in pos or pos == "G":
+                    mapped = "PG" if "Point" in pos else "SG"
+                elif "Forward" in pos or pos == "F":
+                    mapped = "SF" if "Small" in pos or pos == "F" else "PF"
+                elif "Center" in pos or pos == "C":
+                    mapped = "C"
+                else:
+                    mapped = "SF"
+                pos_lookup[pid] = mapped
+        logger.info(f"NBA position lookup: {len(pos_lookup)} players")
+    except Exception as e:
+        logger.warning(f"NBA position lookup failed: {e}")
 
     all_player_seasons: dict[str, dict] = {}
 
     for season in seasons:
         try:
             logger.info(f"Fetching NBA season {season}...")
-            time.sleep(1)  # Rate limit
+            time.sleep(0.6)
             stats = leaguedashplayerstats.LeagueDashPlayerStats(
                 season=season,
                 season_type_all_star="Regular Season",
@@ -128,47 +156,58 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                 if not pid:
                     continue
 
-                name = row.get("PLAYER_NAME", "")
-                team_abv = row.get("TEAM_ABBREVIATION", "")
-                pos = str(row.get("START_POSITION", "") or "").strip()
+                name = str(row.get("PLAYER_NAME", "") or "")
+                team_abv = str(row.get("TEAM_ABBREVIATION", "") or "")
                 games = int(row.get("GP", 0) or 0)
 
                 if games < 5:
                     continue
 
-                # Map position
-                if not pos or pos not in NBA_POSITIONS:
-                    pos = "SF"  # Default
+                # Get position from lookup
+                pos = pos_lookup.get(pid, "")
+                if not pos:
+                    pos = "SF"  # default
+
+                pts = round(float(row.get("PTS", 0) or 0), 1)
+                reb = round(float(row.get("REB", 0) or 0), 1)
+                ast = round(float(row.get("AST", 0) or 0), 1)
+                stl = round(float(row.get("STL", 0) or 0), 1)
+                blk = round(float(row.get("BLK", 0) or 0), 1)
+                tov = round(float(row.get("TOV", 0) or 0), 1)
+                fg3m = round(float(row.get("FG3M", 0) or 0), 1)
 
                 season_rec = {
                     "season": season,
                     "games": games,
-                    "pts": round(float(row.get("PTS", 0) or 0), 1),
-                    "reb": round(float(row.get("REB", 0) or 0), 1),
-                    "ast": round(float(row.get("AST", 0) or 0), 1),
-                    "stl": round(float(row.get("STL", 0) or 0), 1),
-                    "blk": round(float(row.get("BLK", 0) or 0), 1),
-                    "tov": round(float(row.get("TOV", 0) or 0), 1),
-                    "fg3m": round(float(row.get("FG3M", 0) or 0), 1),
+                    "pts": pts,
+                    "reb": reb,
+                    "ast": ast,
+                    "stl": stl,
+                    "blk": blk,
+                    "tov": tov,
+                    "fg3m": fg3m,
                     "fg_pct": round(float(row.get("FG_PCT", 0) or 0) * 100, 1),
                     "ft_pct": round(float(row.get("FT_PCT", 0) or 0) * 100, 1),
                     "min": round(float(row.get("MIN", 0) or 0), 1),
                 }
-                season_rec["fpts"] = _compute_fpts(season_rec)
-                season_rec["fpts_per_game"] = season_rec["fpts"]
+                fpts = _compute_fpts({"pts": pts, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov, "fg3m": fg3m})
+                season_rec["fpts"] = fpts
+                season_rec["fpts_per_game"] = fpts  # already per-game since stats are PerGame
 
                 if pid not in all_player_seasons:
                     all_player_seasons[pid] = {
                         "ext_id": f"NBA_{pid}",
-                        "name": str(name),
+                        "name": name,
                         "position": pos,
                         "team": team_abv,
                         "seasons": [],
                         "sport": "nba",
                     }
                 else:
-                    # Update team to latest
                     all_player_seasons[pid]["team"] = team_abv
+                    # Update position if we have a better one
+                    if pos != "SF":
+                        all_player_seasons[pid]["position"] = pos
 
                 all_player_seasons[pid]["seasons"].append(season_rec)
 
