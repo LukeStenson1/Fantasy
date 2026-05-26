@@ -116,8 +116,12 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
 
             for _, row in df.iterrows():
                 name = str(row.get("Name", "") or "")
-                team = str(row.get("Tm", "") or "")
-                pos = str(row.get("Pos", "") or "").strip().upper()
+                team = str(row.get("Tm", "") or "").strip()
+                # Handle multi-team players (shows as "TOT" for traded players)
+                if team == "TOT":
+                    team = str(row.get("Tm", "TOT"))
+                pos_raw = str(row.get("Pos Summary", "") or row.get("Pos", "") or "").strip().upper()
+                pos = pos_raw
                 games = safe_int(row.get("G"))
                 pid = f"BAT_{name.replace(' ', '_')}_{team}"
 
