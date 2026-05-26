@@ -1050,8 +1050,11 @@ async def analyze_trade(payload: TradeIn):
 
 # ---------- Teams ----------
 @api.get("/teams")
-async def teams():
-    pipeline = [{"$group": {"_id": "$team"}}, {"$sort": {"_id": 1}}]
+async def teams(sport: Optional[str] = None):
+    q = {}
+    if sport and sport != "nfl":
+        q["sport"] = sport
+    pipeline = [{"$match": q}, {"$group": {"_id": "$team"}}, {"$sort": {"_id": 1}}]
     rows = await db.players.aggregate(pipeline).to_list(length=200)
     return [r["_id"] for r in rows if r["_id"]]
 
