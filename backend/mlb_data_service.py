@@ -114,6 +114,10 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 continue
             logger.info(f"Fetched MLB batting {season}: {len(df)} players")
 
+            if season == current_year:
+                logger.info(f"MLB batting columns: {list(df.columns)[:20]}")
+                logger.info(f"MLB batting sample row: {df.iloc[0].to_dict()}")
+            
             for _, row in df.iterrows():
                 name = str(row.get("Name", "") or "")
                 team = str(row.get("Tm", "") or "").strip()
