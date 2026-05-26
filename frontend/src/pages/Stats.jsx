@@ -46,7 +46,6 @@ export default function Stats() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Reset filters when sport changes
   useEffect(() => {
     setPosition("ALL");
     setTeam("ALL");
@@ -54,7 +53,7 @@ export default function Stats() {
     if (sport === "nba") setSeason("2025-26");
     else if (sport === "mlb") setSeason(String(currentYear));
     else setSeason(String(currentYear - 1));
-  }, [sport]);
+  }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const positions = sport === "nba" ? NBA_POSITIONS : sport === "mlb" ? MLB_POSITIONS : NFL_POSITIONS;
   const seasons = sport === "nba" ? NBA_SEASONS : sport === "mlb" ? MLB_SEASONS : NFL_SEASONS;
