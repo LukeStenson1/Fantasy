@@ -16,12 +16,16 @@ NBA_POSITIONS = {"PG", "SG", "SF", "PF", "C"}
 # PTS=1, REB=1.2, AST=1.5, STL=3, BLK=3, TO=-1, 3PM=0.5
 FP_WEIGHTS = {
     "pts": 1.0,
-    "reb": 1.2,
-    "ast": 1.5,
-    "stl": 3.0,
-    "blk": 3.0,
-    "tov": -1.0,
-    "fg3m": 0.5,
+    "fgm": 2.0,
+    "fga": -1.0,
+    "ftm": 1.0,
+    "fta": -1.0,
+    "fg3m": 1.0,
+    "reb": 1.0,
+    "ast": 2.0,
+    "stl": 4.0,
+    "blk": 4.0,
+    "tov": -2.0,
 }
 
 NBA_TEAMS = [
@@ -42,14 +46,20 @@ TEAM_NAME_TO_ABV = {name: abv for abv, name in NBA_TEAMS}
 TEAM_ABV_TO_NAME = {abv: name for abv, name in NBA_TEAMS}
 
 def _compute_fpts(row: dict) -> float:
-    pts = (row.get("pts") or 0) * FP_WEIGHTS["pts"]
-    reb = (row.get("reb") or 0) * FP_WEIGHTS["reb"]
-    ast = (row.get("ast") or 0) * FP_WEIGHTS["ast"]
-    stl = (row.get("stl") or 0) * FP_WEIGHTS["stl"]
-    blk = (row.get("blk") or 0) * FP_WEIGHTS["blk"]
-    tov = (row.get("tov") or 0) * FP_WEIGHTS["tov"]
-    fg3m = (row.get("fg3m") or 0) * FP_WEIGHTS["fg3m"]
-    return round(pts + reb + ast + stl + blk + tov + fg3m, 2)
+    return round(
+        (row.get("pts") or 0) * 1.0 +
+        (row.get("fgm") or 0) * 2.0 +
+        (row.get("fga") or 0) * -1.0 +
+        (row.get("ftm") or 0) * 1.0 +
+        (row.get("fta") or 0) * -1.0 +
+        (row.get("fg3m") or 0) * 1.0 +
+        (row.get("reb") or 0) * 1.0 +
+        (row.get("ast") or 0) * 2.0 +
+        (row.get("stl") or 0) * 4.0 +
+        (row.get("blk") or 0) * 4.0 +
+        (row.get("tov") or 0) * -2.0,
+        2
+    )
 
 def _detect_nba_tag(seasons: list[dict], position: str) -> str | None:
     if not seasons:
@@ -110,25 +120,32 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
     # Build position lookup from static player data
     pos_lookup = {}
     try:
-        all_players = nba_players_static.get_active_players()
-        # nba_api static doesn't have position — use commonallplayers
         time.sleep(0.6)
         cap = commonallplayers.CommonAllPlayers(is_only_current_season=0)
         cap_df = cap.get_data_frames()[0]
         for _, row in cap_df.iterrows():
             pid = str(row.get("PERSON_ID", ""))
             pos = str(row.get("POSITION", "") or "").strip()
-            if pid and pos:
-                # Map full position names to abbreviations
-                if "Guard" in pos or pos == "G":
-                    mapped = "PG" if "Point" in pos else "SG"
-                elif "Forward" in pos or pos == "F":
-                    mapped = "SF" if "Small" in pos or pos == "F" else "PF"
-                elif "Center" in pos or pos == "C":
-                    mapped = "C"
-                else:
-                    mapped = "SF"
-                pos_lookup[pid] = mapped
+            if not pid or not pos:
+                continue
+            p = pos.upper()
+            if p == "G" or "POINT" in p or p == "PG":
+                mapped = "PG"
+            elif "GUARD" in p or p == "SG":
+                mapped = "SG"
+            elif p == "F" or ("FORWARD" in p and "POWER" not in p and "CENTER" not in p):
+                mapped = "SF"
+            elif "POWER" in p or "PF" in p:
+                mapped = "PF"
+            elif "CENTER" in p or p == "C":
+                mapped = "C"
+            elif "FORWARD-CENTER" in p or "CENTER-FORWARD" in p:
+                mapped = "PF"
+            elif "GUARD-FORWARD" in p or "FORWARD-GUARD" in p:
+                mapped = "SF"
+            else:
+                mapped = "SF"
+            pos_lookup[pid] = mapped
         logger.info(f"NBA position lookup: {len(pos_lookup)} players")
     except Exception as e:
         logger.warning(f"NBA position lookup failed: {e}")
@@ -176,6 +193,11 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                 tov = round(float(row.get("TOV", 0) or 0), 1)
                 fg3m = round(float(row.get("FG3M", 0) or 0), 1)
 
+                fgm = round(float(row.get("FGM", 0) or 0), 1)
+                fga = round(float(row.get("FGA", 0) or 0), 1)
+                ftm = round(float(row.get("FTM", 0) or 0), 1)
+                fta = round(float(row.get("FTA", 0) or 0), 1)
+
                 season_rec = {
                     "season": season,
                     "games": games,
@@ -186,11 +208,15 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                     "blk": blk,
                     "tov": tov,
                     "fg3m": fg3m,
+                    "fgm": fgm,
+                    "fga": fga,
+                    "ftm": ftm,
+                    "fta": fta,
                     "fg_pct": round(float(row.get("FG_PCT", 0) or 0) * 100, 1),
                     "ft_pct": round(float(row.get("FT_PCT", 0) or 0) * 100, 1),
                     "min": round(float(row.get("MIN", 0) or 0), 1),
                 }
-                fpts = _compute_fpts({"pts": pts, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov, "fg3m": fg3m})
+                fpts = _compute_fpts({"pts": pts, "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta, "fg3m": fg3m, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov})
                 season_rec["fpts"] = fpts
                 season_rec["fpts_per_game"] = fpts  # already per-game since stats are PerGame
 
