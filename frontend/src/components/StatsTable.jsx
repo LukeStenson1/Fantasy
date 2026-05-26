@@ -315,16 +315,47 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
             <table className="pfr-table w-full" data-testid={`career-table-${player.id}`}>
               <thead><tr>
                 <th>Season</th><th>G</th>
-                {!isK && <><th>Pass Yd</th><th>Pass TD</th><th>INT</th><th>Rush Yd</th><th>Rush TD</th><th>Rec</th><th>Tgt</th><th>Rec Yd</th><th>Rec TD</th></>}
-                {isK && <><th>FGM</th><th>FGA</th><th>FG%</th><th>40-49</th><th>50-59</th><th>60+</th><th>PAT</th></>}
+                {sport === "nba" && <><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>3PM</th><th>FG%</th><th>FT%</th></>}
+                {sport === "mlb" && full.player_type === "pitcher" && <><th>IP</th><th>W</th><th>SV</th><th>K</th><th>ERA</th><th>WHIP</th></>}
+                {sport === "mlb" && full.player_type !== "pitcher" && <><th>H</th><th>R</th><th>HR</th><th>RBI</th><th>SB</th><th>AVG</th><th>OPS</th></>}
+                {sport === "nfl" && !isK && <><th>Pass Yd</th><th>Pass TD</th><th>INT</th><th>Rush Yd</th><th>Rush TD</th><th>Rec</th><th>Tgt</th><th>Rec Yd</th><th>Rec TD</th></>}
+                {sport === "nfl" && isK && <><th>FGM</th><th>FGA</th><th>FG%</th><th>40-49</th><th>50-59</th><th>60+</th><th>PAT</th></>}
                 <th className="text-emerald-300">FPts</th><th className="text-emerald-300">FPts/G</th>
               </tr></thead>
               <tbody>
                 {seasons.map((s) => (
                   <tr key={s.season}>
                     <td className="font-bold text-white">{s.season}</td>
-                    <td className="font-mono-tab">{s.games}</td>
-                    {!isK && <>
+                    <td className="font-mono-tab">{s.games ?? s.G}</td>
+                    {sport === "nba" && <>
+                      <td className="font-mono-tab">{s.pts ?? "—"}</td>
+                      <td className="font-mono-tab">{s.reb ?? "—"}</td>
+                      <td className="font-mono-tab">{s.ast ?? "—"}</td>
+                      <td className="font-mono-tab">{s.stl ?? "—"}</td>
+                      <td className="font-mono-tab">{s.blk ?? "—"}</td>
+                      <td className="font-mono-tab">{s.tov ?? "—"}</td>
+                      <td className="font-mono-tab">{s.fg3m ?? "—"}</td>
+                      <td className="font-mono-tab">{s.fg_pct ?? "—"}</td>
+                      <td className="font-mono-tab">{s.ft_pct ?? "—"}</td>
+                    </>}
+                    {sport === "mlb" && full.player_type === "pitcher" && <>
+                      <td className="font-mono-tab">{s.IP ?? "—"}</td>
+                      <td className="font-mono-tab">{s.W ?? "—"}</td>
+                      <td className="font-mono-tab">{s.SV ?? "—"}</td>
+                      <td className="font-mono-tab">{s.SO ?? "—"}</td>
+                      <td className="font-mono-tab">{s.ERA ?? "—"}</td>
+                      <td className="font-mono-tab">{s.WHIP ?? "—"}</td>
+                    </>}
+                    {sport === "mlb" && full.player_type !== "pitcher" && <>
+                      <td className="font-mono-tab">{s.H ?? "—"}</td>
+                      <td className="font-mono-tab">{s.R ?? "—"}</td>
+                      <td className="font-mono-tab">{s.HR ?? "—"}</td>
+                      <td className="font-mono-tab">{s.RBI ?? "—"}</td>
+                      <td className="font-mono-tab">{s.SB ?? "—"}</td>
+                      <td className="font-mono-tab">{s.AVG ?? "—"}</td>
+                      <td className="font-mono-tab">{s.OPS ?? "—"}</td>
+                    </>}
+                    {sport === "nfl" && !isK && <>
                       <td className="font-mono-tab">{s.pass_yds?.toLocaleString() || "—"}</td>
                       <td className="font-mono-tab">{s.pass_td || "—"}</td>
                       <td className="font-mono-tab">{s.pass_int || "—"}</td>
@@ -335,7 +366,7 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
                       <td className="font-mono-tab">{s.rec_yds?.toLocaleString() || "—"}</td>
                       <td className="font-mono-tab">{s.rec_td || "—"}</td>
                     </>}
-                    {isK && <>
+                    {sport === "nfl" && isK && <>
                       <td className="font-mono-tab">{s.fg_made ?? "—"}</td>
                       <td className="font-mono-tab">{s.fg_att ?? "—"}</td>
                       <td className="font-mono-tab">{s.fg_pct ? `${s.fg_pct}%` : "—"}</td>
@@ -344,8 +375,12 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
                       <td className="font-mono-tab">{s.fg_made_60_ ?? "—"}</td>
                       <td className="font-mono-tab">{s.pat_made ?? "—"}</td>
                     </>}
-                    <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_${scoring}`]}</td>
-                    <td className="font-mono-tab font-bold text-emerald-300">{s[`fpts_per_game_${scoring}`]}</td>
+                    <td className="font-mono-tab font-bold text-emerald-300">
+                      {sport === "nfl" ? s[`fpts_${scoring}`] : s.fpts}
+                    </td>
+                    <td className="font-mono-tab font-bold text-emerald-300">
+                      {sport === "nfl" ? s[`fpts_per_game_${scoring}`] : s.fpts_per_game}
+                    </td>
                   </tr>
                 ))}
               </tbody>
