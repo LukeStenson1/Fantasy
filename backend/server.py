@@ -204,6 +204,45 @@ async def list_players(
         q["position"] = position
     if team and team != "ALL":
         q["team"] = team
+    if tag:
+        q["tag"] = tag
+    if search:
+        q["name"] = {"$regex": search, "$options": "i"}
+    cursor = db.players.find(q, {"_id": 0, "news": 0})
+    items = await cursor.to_list(length=2000)
+    items = [_attach_current_season(p, season, scoring) for p in items]
+    # Attach matchup info for all players
+    for p in items:
+        info = get_next_opponent(p.get("team", ""))
+        if info:
+            p["next_opponent"] = info["opponent"]
+            if p["position"] == "DEF":
+                opp = info["opponent"]
+                pos_ranks = []
+                for pos in ["QB", "RB", "WR", "TE"]:
+                    rank = get_def_rank(p.get("team", ""), pos)
+                    pos_ranks.append(rank)
+                avg_rank = sum(pos_ranks) / len(pos_ranks) if pos_ranks else 16
+                p["matchup_score"] = round((16.5 - avg_rank) / 7.75, 2)
+            else:
+                p["matchup_score"] = matchup_score(info["opponent"], p["position"])
+                dvp = get_def_dvp(info["opponent"], p["position"])
+                p["matchup_def_rank"] = dvp.get("rank", 16)
+                p["matchup_def_fpts_allowed"] = dvp.get("fpts_allowed_per_game")
+                p["matchup_def_source"] = dvp.get("source")
+    # For NBA/MLB, show all players; for NFL only show players with current_season unless explicitly filtered
+    is_nfl = not sport or sport == "nfl"
+    has_explicit_filter = bool(search) or position in ("DEF", "K") or tag is not None or not is_nfl
+    if not has_explicit_filter:
+        items = [p for p in items if p.get("current_season")]
+    reverse = direction == "desc"
+    def keyfn(p):
+        v = p.get(sort)
+        if v is None and p.get("current_season"):
+            v = p["current_season"].get(sort)
+        return v if v is not None else (float("-inf") if reverse else float("inf"))
+    items.sort(key=keyfn, reverse=reverse)
+    return {"count": len(items), "items": items[:limit]}
 
 
 @api.get("/players/{player_id}")
