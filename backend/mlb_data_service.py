@@ -359,7 +359,9 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
 
     # Build final list
     final = []
+    logger.info(f"Building final MLB list from {len(all_player_seasons)} entries")
     for pid, entry in all_player_seasons.items():
+        try:
         seasons_sorted = sorted(entry["seasons"], key=lambda s: s["season"])
         latest = seasons_sorted[-1] if seasons_sorted else {}
         tag = _detect_mlb_tag(seasons_sorted, entry["position"])
