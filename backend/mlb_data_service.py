@@ -170,18 +170,10 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
 
 
 def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
-    """Fetch MLB player stats using pybaseball."""
-    mlb_pos_lookup = _fetch_mlb_positions()
-    try:
-        from pybaseball import batting_stats_bref as batting_stats
-        from pybaseball import pitching_stats_bref as pitching_stats
-        from pybaseball import cache
-        cache.enable()
-        import pandas as pd
-        import math
-    except ImportError:
-        logger.error("pybaseball not installed")
-        return []
+    """Fetch MLB player stats using MLB Stats API directly."""
+    import urllib.request
+    import json
+    import math
 
     def safe_int(v):
         try:
@@ -199,128 +191,122 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
         except Exception:
             return 0.0
 
+    def mlb_api_get(url):
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read())
+
     current_year = datetime.now(timezone.utc).year
     seasons = list(range(current_year - seasons_back + 1, current_year + 1))
 
     all_player_seasons: dict[str, dict] = {}
 
-    # ── Batters ──
     for season in seasons:
+        # ── Batters ──
         try:
-            df = batting_stats(season)
-            if df is not None and not df.empty:
-                min_games = 10 if season == current_year else 20
-                df = df[df["G"] >= min_games]
-            if df is None or df.empty:
-                logger.warning(f"No MLB batting data for {season}")
-                continue
-            logger.info(f"Fetched MLB batting {season}: {len(df)} players")
+            url = (
+                f"https://statsapi.mlb.com/api/v1/stats"
+                f"?stats=season&season={season}&group=hitting"
+                f"&gameType=R&limit=1000&offset=0"
+                f"&fields=stats,splits,stat,player,team,season"
+            )
+            data = mlb_api_get(url)
+            splits = data.get("stats", [{}])[0].get("splits", [])
+            logger.info(f"Fetched MLB batting {season}: {len(splits)} players")
 
-            for _, row in df.iterrows():
-                name = _fix_name_encoding(row.get("Name", ""))
-                if not name:
+            for split in splits:
+                stat = split.get("stat", {})
+                player = split.get("player", {})
+                team = split.get("team", {})
+
+                pid = str(player.get("id", ""))
+                if not pid:
                     continue
 
-                tm_raw = str(row.get("Tm", "") or "").strip()
-                lev = str(row.get("Lev", "") or "").strip()
-                team = _normalize_mlb_team(tm_raw, lev)
+                name = player.get("fullName", "")
+                team_abv = team.get("abbreviation", "")
+                games = safe_int(stat.get("gamesPlayed"))
 
-                games = safe_int(row.get("G"))
-                # Use mlbID as stable identifier if available
-                mlb_id = row.get("mlbID")
-                if mlb_id and not (isinstance(mlb_id, float) and math.isnan(mlb_id)):
-                    pid = f"BAT_{int(mlb_id)}"
-                else:
-                    import unicodedata
-                    name_normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
-                    pid = f"BAT_{name_normalized.replace(' ', '_')}_{team}"
+                if games < (5 if season == current_year else 20):
+                    continue
 
-                # No position column in batting_stats_bref — default to OF
-                # Most batters will be OF; specific positions not available from this source
-                pos = mlb_pos_lookup.get(str(int(row["mlbID"])) if row.get("mlbID") and not (isinstance(row.get("mlbID"), float) and math.isnan(row.get("mlbID"))) else "", "OF")
+                # Get position from players endpoint
+                pos = "OF"  # will be overridden by position lookup
 
                 season_rec = {
                     "season": season,
                     "G": games,
-                    "AB": safe_int(row.get("AB")),
-                    "H": safe_int(row.get("H")),
-                    "R": safe_int(row.get("R")),
-                    "HR": safe_int(row.get("HR")),
-                    "RBI": safe_int(row.get("RBI")),
-                    "SB": safe_int(row.get("SB")),
-                    "BB": safe_int(row.get("BB")),
-                    "SO": safe_int(row.get("SO")),
-                    "AVG": safe_float(row.get("BA"), 3),
-                    "OBP": safe_float(row.get("OBP"), 3),
-                    "SLG": safe_float(row.get("SLG"), 3),
-                    "OPS": safe_float(row.get("OPS"), 3),
+                    "AB": safe_int(stat.get("atBats")),
+                    "H": safe_int(stat.get("hits")),
+                    "R": safe_int(stat.get("runs")),
+                    "HR": safe_int(stat.get("homeRuns")),
+                    "RBI": safe_int(stat.get("rbi")),
+                    "SB": safe_int(stat.get("stolenBases")),
+                    "BB": safe_int(stat.get("baseOnBalls")),
+                    "SO": safe_int(stat.get("strikeOuts")),
+                    "AVG": safe_float(stat.get("avg"), 3),
+                    "OBP": safe_float(stat.get("obp"), 3),
+                    "SLG": safe_float(stat.get("slg"), 3),
+                    "OPS": safe_float(stat.get("ops"), 3),
                 }
                 fpts = _compute_batter_fpts(season_rec)
                 season_rec["fpts"] = fpts
                 season_rec["fpts_per_game"] = round(fpts / max(games, 1), 2)
 
-                if pid not in all_player_seasons:
-                    all_player_seasons[pid] = {
-                        "ext_id": f"MLB_{pid}",
+                bpid = f"BAT_{pid}"
+                if bpid not in all_player_seasons:
+                    all_player_seasons[bpid] = {
+                        "ext_id": f"MLB_{bpid}",
                         "name": name,
                         "position": pos,
-                        "team": team,
+                        "team": team_abv,
                         "sport": "mlb",
                         "player_type": "batter",
+                        "mlb_id": pid,
                         "seasons": [],
                     }
                 else:
-                    all_player_seasons[pid]["team"] = team
+                    all_player_seasons[bpid]["team"] = team_abv
 
-                all_player_seasons[pid]["seasons"].append(season_rec)
+                all_player_seasons[bpid]["seasons"].append(season_rec)
 
         except Exception as e:
             logger.warning(f"MLB batting {season} failed: {e}")
 
-    # ── Pitchers ──
-    for season in seasons:
+        # ── Pitchers ──
         try:
-            df = pitching_stats(season)
-            if df is not None and not df.empty:
-                df = df[df["G"] >= 5]
-            if df is None or df.empty:
-                logger.warning(f"No MLB pitching data for {season}")
-                continue
-            logger.info(f"Fetched MLB pitching {season}: {len(df)} players")
-            if season == current_year:
-                sample = df.iloc[0]
-                logger.info(f"MLB pitching {season} sample: Name={sample.get('Name','?')}, mlbID={sample.get('mlbID','?')}, cols={list(df.columns)[:10]}")
+            url = (
+                f"https://statsapi.mlb.com/api/v1/stats"
+                f"?stats=season&season={season}&group=pitching"
+                f"&gameType=R&limit=1000&offset=0"
+                f"&fields=stats,splits,stat,player,team,season"
+            )
+            data = mlb_api_get(url)
+            splits = data.get("stats", [{}])[0].get("splits", [])
+            logger.info(f"Fetched MLB pitching {season}: {len(splits)} players")
 
-            if season == current_year:
-                logger.info(f"MLB pitching {season} sample: {df.iloc[0].get('Name','?')} mlbID={df.iloc[0].get('mlbID','?')} G={df.iloc[0].get('G','?')}")
-            
-            for _, row in df.iterrows():
-                name = _fix_name_encoding(row.get("Name", ""))
-                if not name:
+            for split in splits:
+                stat = split.get("stat", {})
+                player = split.get("player", {})
+                team = split.get("team", {})
+
+                pid = str(player.get("id", ""))
+                if not pid:
                     continue
 
-                tm_raw = str(row.get("Tm", "") or row.get("Team", "") or "").strip()
-                lev = str(row.get("Lev", "") or "").strip()
-                team = _normalize_mlb_team(tm_raw, lev)
+                name = player.get("fullName", "")
+                team_abv = team.get("abbreviation", "")
+                games = safe_int(stat.get("gamesPlayed"))
+                gs = safe_int(stat.get("gamesStarted"))
 
-                games = safe_int(row.get("G"))
-                gs = safe_int(row.get("GS"))
+                if games < (2 if season == current_year else 5):
+                    continue
 
-                mlb_id = row.get("mlbID")
-                if mlb_id and not (isinstance(mlb_id, float) and math.isnan(mlb_id)):
-                    pid = f"PIT_{int(mlb_id)}"
-                else:
-                    # Normalize name for consistent pid across seasons
-                    import unicodedata
-                    name_normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
-                    pid = f"PIT_{name_normalized.replace(' ', '_')}_{team}"
                 pos = "SP" if gs >= games * 0.5 else "RP"
 
-                ip_raw = row.get("IP", 0) or 0
+                ip_str = stat.get("inningsPitched", "0") or "0"
                 try:
-                    ip = float(ip_raw)
-                    if math.isnan(ip):
-                        ip = 0.0
+                    ip = float(ip_str)
                 except Exception:
                     ip = 0.0
 
@@ -329,38 +315,49 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                     "G": games,
                     "GS": gs,
                     "IP": round(ip, 1),
-                    "W": safe_int(row.get("W")),
-                    "L": safe_int(row.get("L")),
-                    "SV": safe_int(row.get("SV")),
-                    "SO": safe_int(row.get("SO")),
-                    "BB": safe_int(row.get("BB")),
-                    "H": safe_int(row.get("H")),
-                    "ER": safe_int(row.get("ER")),
-                    "ERA": safe_float(row.get("ERA")),
-                    "WHIP": safe_float(row.get("WHIP")),
-                    "K9": safe_float(row.get("SO9"), 1),
+                    "W": safe_int(stat.get("wins")),
+                    "L": safe_int(stat.get("losses")),
+                    "SV": safe_int(stat.get("saves")),
+                    "SO": safe_int(stat.get("strikeOuts")),
+                    "BB": safe_int(stat.get("baseOnBalls")),
+                    "H": safe_int(stat.get("hits")),
+                    "ER": safe_int(stat.get("earnedRuns")),
+                    "ERA": safe_float(stat.get("era")),
+                    "WHIP": safe_float(stat.get("whip")),
+                    "K9": safe_float(stat.get("strikeoutsPer9Inn"), 1),
                 }
                 fpts = _compute_pitcher_fpts(season_rec)
                 season_rec["fpts"] = fpts
                 season_rec["fpts_per_game"] = round(fpts / max(games, 1), 2)
 
-                if pid not in all_player_seasons:
-                    all_player_seasons[pid] = {
-                        "ext_id": f"MLB_{pid}",
+                ppid = f"PIT_{pid}"
+                if ppid not in all_player_seasons:
+                    all_player_seasons[ppid] = {
+                        "ext_id": f"MLB_{ppid}",
                         "name": name,
                         "position": pos,
-                        "team": team,
+                        "team": team_abv,
                         "sport": "mlb",
                         "player_type": "pitcher",
+                        "mlb_id": pid,
                         "seasons": [],
                     }
                 else:
-                    all_player_seasons[pid]["team"] = team
+                    all_player_seasons[ppid]["team"] = team_abv
 
-                all_player_seasons[pid]["seasons"].append(season_rec)
+                all_player_seasons[ppid]["seasons"].append(season_rec)
 
         except Exception as e:
             logger.warning(f"MLB pitching {season} failed: {e}")
+
+    # Apply position lookup
+    pos_lookup = _fetch_mlb_positions()
+    for pid_key, entry in all_player_seasons.items():
+        mlb_id = entry.get("mlb_id", "")
+        if mlb_id and entry.get("player_type") == "batter":
+            looked_up = pos_lookup.get(str(mlb_id))
+            if looked_up:
+                entry["position"] = looked_up
 
     # Build final list
     final = []
