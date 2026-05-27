@@ -231,7 +231,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
 
                 # No position column in batting_stats_bref — default to OF
                 # Most batters will be OF; specific positions not available from this source
-                pos = "OF"
+                pos = mlb_pos_lookup.get(str(int(row["mlbID"])) if row.get("mlbID") and not (isinstance(row.get("mlbID"), float) and math.isnan(row.get("mlbID"))) else "", "OF")
 
                 season_rec = {
                     "season": season,
