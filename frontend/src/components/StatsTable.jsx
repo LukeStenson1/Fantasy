@@ -222,8 +222,10 @@ function PlayerRow({ player, expanded, onToggle, scoring, columns, sport }) {
               formatted = <span className={`font-mono-tab font-bold ${color}`}>{v > 0 ? `+${v}` : v}</span>;
             }
           } else {
+            const MLB_RATIO_KEYS = new Set(["AVG", "OBP", "SLG", "OPS", "fg_pct", "ft_pct"]);
             formatted = v == null ? "—" :
               c.key === "season" ? String(v) :
+              MLB_RATIO_KEYS.has(c.key) ? (typeof v === "number" ? v.toFixed(3).replace(/^0\./, ".") : v) :
               typeof v === "number" ? v.toLocaleString() : v;
           }
           return (
