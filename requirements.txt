@@ -34,3 +34,4 @@ polars>=0.20.0
 pyarrow>=14.0.0
 nba_api>=1.4.0
 pybaseball>=2.2.0
+MLB-StatsAPI>=1.7.2
