@@ -362,32 +362,31 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
     logger.info(f"Building final MLB list from {len(all_player_seasons)} entries")
     for pid, entry in all_player_seasons.items():
         try:
-        seasons_sorted = sorted(entry["seasons"], key=lambda s: s["season"])
-        latest = seasons_sorted[-1] if seasons_sorted else {}
-        tag = _detect_mlb_tag(seasons_sorted, entry["position"])
+            seasons_sorted = sorted(entry["seasons"], key=lambda s: s["season"])
+            latest = seasons_sorted[-1] if seasons_sorted else {}
+            tag = _detect_mlb_tag(seasons_sorted, entry["position"])
 
-        final.append({
-            "id": str(uuid.uuid4()),
-            "ext_id": entry["ext_id"],
-            "name": entry["name"],
-            "position": entry["position"],
-            "team": entry["team"],
-            "sport": "mlb",
-            "player_type": entry.get("player_type", "batter"),
-            "age": None,
-            "experience": len(seasons_sorted),
-            "headshot": "",
-            "tag": tag,
-            "rookie_info": None,
-            "seasons": seasons_sorted,
-            "news": [],
-            "current_fpts": latest.get("fpts_per_game", 0),
-            "current_fpts_per_game": latest.get("fpts_per_game", 0),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-
-    except Exception as e:
+            final.append({
+                "id": str(uuid.uuid4()),
+                "ext_id": entry["ext_id"],
+                "name": entry["name"],
+                "position": entry["position"],
+                "team": entry["team"],
+                "sport": "mlb",
+                "player_type": entry.get("player_type", "batter"),
+                "age": None,
+                "experience": len(seasons_sorted),
+                "headshot": "",
+                "tag": tag,
+                "rookie_info": None,
+                "seasons": seasons_sorted,
+                "news": [],
+                "current_fpts": latest.get("fpts_per_game", 0),
+                "current_fpts_per_game": latest.get("fpts_per_game", 0),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
             logger.warning(f"MLB build error for {pid}: {e}")
             continue
 
