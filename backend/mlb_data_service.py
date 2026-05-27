@@ -9,24 +9,60 @@ from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger("ffref.mlb")
 
+# Map full city/team names from Baseball Reference to abbreviations
 MLB_TEAM_NAME_TO_ABV = {
     "Arizona": "ARI", "Atlanta": "ATL", "Baltimore": "BAL", "Boston": "BOS",
-    "Chicago": "CHC", "Chicago": "CWS", "Cincinnati": "CIN", "Cleveland": "CLE",
-    "Colorado": "COL", "Detroit": "DET", "Houston": "HOU", "Kansas City": "KC",
-    "Los Angeles": "LAD", "Miami": "MIA", "Milwaukee": "MIL", "Minnesota": "MIN",
-    "New York": "NYM", "Oakland": "OAK", "Philadelphia": "PHI", "Pittsburgh": "PIT",
+    "Cincinnati": "CIN", "Cleveland": "CLE", "Colorado": "COL", "Detroit": "DET",
+    "Houston": "HOU", "Kansas City": "KC", "Miami": "MIA", "Milwaukee": "MIL",
+    "Minnesota": "MIN", "Oakland": "OAK", "Philadelphia": "PHI", "Pittsburgh": "PIT",
     "San Diego": "SD", "San Francisco": "SF", "Seattle": "SEA", "St. Louis": "STL",
     "Tampa Bay": "TB", "Texas": "TEX", "Toronto": "TOR", "Washington": "WSH",
+    # AL/NL disambiguation
+    "Chicago": "CHC",      # default Chicago to Cubs; White Sox handled below
+    "Los Angeles": "LAD",  # default LA to Dodgers; Angels handled below
+    "New York": "NYM",     # default NY to Mets; Yankees handled below
+    # Full team names
     "Cubs": "CHC", "White Sox": "CWS", "Yankees": "NYY", "Mets": "NYM",
     "Dodgers": "LAD", "Angels": "LAA", "Athletics": "OAK",
+    # Lev-based disambiguation keys (used with Lev column)
+    "Chicago-AL": "CWS", "Chicago-NL": "CHC",
+    "Los Angeles-AL": "LAA", "Los Angeles-NL": "LAD",
+    "New York-AL": "NYY", "New York-NL": "NYM",
 }
 
 MLB_BATTER_POSITIONS = {"C", "1B", "2B", "3B", "SS", "OF", "DH"}
 MLB_PITCHER_POSITIONS = {"SP", "RP"}
 
-# Fantasy scoring — standard points league
-# Batters: H=1, R=1, HR=4, RBI=1, SB=2, BB=1, HBP=1, SO=-0.5
-# Pitchers: IP=3, K=1, W=5, SV=5, HLD=3, ER=-1, BB=-0.5, H=-0.5
+
+def _normalize_mlb_team(tm: str, lev: str = "") -> str:
+    """Convert full team name to abbreviation using Lev to disambiguate."""
+    tm = tm.strip()
+    lev = lev.strip()
+    if not tm or tm == "TOT":
+        return tm
+    # Try disambiguation with league
+    if tm in ("Chicago", "Los Angeles", "New York"):
+        league = "AL" if "-AL" in lev else "NL" if "-NL" in lev else ""
+        if league:
+            key = f"{tm}-{league}"
+            if key in MLB_TEAM_NAME_TO_ABV:
+                return MLB_TEAM_NAME_TO_ABV[key]
+    return MLB_TEAM_NAME_TO_ABV.get(tm, tm[:3].upper() if len(tm) >= 3 else tm)
+
+
+def _fix_name_encoding(raw) -> str:
+    """Fix UTF-8 encoding issues in player names from pybaseball."""
+    if raw is None:
+        return ""
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8", errors="replace").strip()
+    s = str(raw).strip()
+    # Try to fix latin-1 misread as utf-8
+    try:
+        return s.encode("latin-1").decode("utf-8").strip()
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return s
+
 
 def _compute_batter_fpts(row: dict) -> float:
     h = (row.get("H") or 0) * 1.0
@@ -38,6 +74,7 @@ def _compute_batter_fpts(row: dict) -> float:
     so = (row.get("SO") or 0) * -0.5
     return round(h + r + hr + rbi + sb + bb + so, 2)
 
+
 def _compute_pitcher_fpts(row: dict) -> float:
     ip = (row.get("IP") or 0) * 3.0
     k = (row.get("SO") or 0) * 1.0
@@ -47,6 +84,7 @@ def _compute_pitcher_fpts(row: dict) -> float:
     bb = (row.get("BB") or 0) * -0.5
     h = (row.get("H") or 0) * -0.5
     return round(ip + k + w + sv + er + bb + h, 2)
+
 
 def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
     if not seasons:
@@ -80,6 +118,7 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
     if fppg >= break_thresh - 2 and games <= min_games and len(seasons_sorted) <= 2:
         return "sleeper"
     return None
+
 
 def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
     """Fetch MLB player stats using pybaseball."""
@@ -126,35 +165,26 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 continue
             logger.info(f"Fetched MLB batting {season}: {len(df)} players")
 
-            if season == current_year:
-                logger.info(f"MLB batting columns: {list(df.columns)[:20]}")
-                logger.info(f"MLB batting sample row: {df.iloc[0].to_dict()}")
-            
             for _, row in df.iterrows():
-                name = str(row.get("Name", "") or "")
-                team = str(row.get("Tm", "") or "").strip()
-                # Handle multi-team players (shows as "TOT" for traded players)
-                if team == "TOT":
-                    team = str(row.get("Tm", "TOT"))
-                pos_raw = str(row.get("Pos Summary", "") or row.get("Pos", "") or "").strip().upper()
-                pos = pos_raw
-                games = safe_int(row.get("G"))
-                pid = f"BAT_{name.replace(' ', '_')}_{team}"
+                name = _fix_name_encoding(row.get("Name", ""))
+                if not name:
+                    continue
 
-                if "DH" in pos:
-                    pos = "DH"
-                elif "C" in pos and "1B" not in pos:
-                    pos = "C"
-                elif "1B" in pos:
-                    pos = "1B"
-                elif "2B" in pos:
-                    pos = "2B"
-                elif "3B" in pos:
-                    pos = "3B"
-                elif "SS" in pos:
-                    pos = "SS"
+                tm_raw = str(row.get("Tm", "") or "").strip()
+                lev = str(row.get("Lev", "") or "").strip()
+                team = _normalize_mlb_team(tm_raw, lev)
+
+                games = safe_int(row.get("G"))
+                # Use mlbID as stable identifier if available
+                mlb_id = row.get("mlbID")
+                if mlb_id and not (isinstance(mlb_id, float) and math.isnan(mlb_id)):
+                    pid = f"BAT_{int(mlb_id)}"
                 else:
-                    pos = "OF"
+                    pid = f"BAT_{name.replace(' ', '_')}_{team}"
+
+                # No position column in batting_stats_bref — default to OF
+                # Most batters will be OF; specific positions not available from this source
+                pos = "OF"
 
                 season_rec = {
                     "season": season,
@@ -206,15 +236,22 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
             logger.info(f"Fetched MLB pitching {season}: {len(df)} players")
 
             for _, row in df.iterrows():
-                raw_name = row.get("Name", "") or ""
-                if isinstance(raw_name, bytes):
-                    name = raw_name.decode("utf-8", errors="replace")
-                else:
-                    name = str(raw_name).encode("utf-8", errors="replace").decode("utf-8", errors="replace")
-                team = str(row.get("Tm", "") or row.get("Team", "") or "").strip()
+                name = _fix_name_encoding(row.get("Name", ""))
+                if not name:
+                    continue
+
+                tm_raw = str(row.get("Tm", "") or row.get("Team", "") or "").strip()
+                lev = str(row.get("Lev", "") or "").strip()
+                team = _normalize_mlb_team(tm_raw, lev)
+
                 games = safe_int(row.get("G"))
                 gs = safe_int(row.get("GS"))
-                pid = f"PIT_{name.replace(' ', '_')}_{team}"
+
+                mlb_id = row.get("mlbID")
+                if mlb_id and not (isinstance(mlb_id, float) and math.isnan(mlb_id)):
+                    pid = f"PIT_{int(mlb_id)}"
+                else:
+                    pid = f"PIT_{name.replace(' ', '_')}_{team}"
 
                 pos = "SP" if gs >= games * 0.5 else "RP"
 
