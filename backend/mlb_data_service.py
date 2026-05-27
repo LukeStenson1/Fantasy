@@ -220,12 +220,11 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 # Use mlbID as stable identifier if available
                 mlb_id = row.get("mlbID")
                 if mlb_id and not (isinstance(mlb_id, float) and math.isnan(mlb_id)):
-                    pid = f"PIT_{int(mlb_id)}"
+                    pid = f"BAT_{int(mlb_id)}"
                 else:
-                    # Normalize name for consistent pid across seasons
                     import unicodedata
                     name_normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
-                    pid = f"PIT_{name_normalized.replace(' ', '_')}_{team}"
+                    pid = f"BAT_{name_normalized.replace(' ', '_')}_{team}"
 
                 # No position column in batting_stats_bref — default to OF
                 # Most batters will be OF; specific positions not available from this source
