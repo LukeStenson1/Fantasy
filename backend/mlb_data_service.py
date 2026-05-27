@@ -91,17 +91,25 @@ def _normalize_mlb_team(tm: str, lev: str = "") -> str:
 
 
 def _fix_name_encoding(raw) -> str:
-    """Fix UTF-8 encoding issues in player names."""
+    """Fix UTF-8 encoding issues in player names from pybaseball."""
     if raw is None:
         return ""
     if isinstance(raw, bytes):
         return raw.decode("utf-8", errors="replace").strip()
     s = str(raw).strip()
-    try:
-        # pybaseball sometimes returns latin-1 decoded as unicode escapes
-        s = s.encode("latin-1").decode("utf-8").strip()
-    except (UnicodeDecodeError, UnicodeEncodeError):
-        pass
+    # Handle literal \xNN escape sequences in the string
+    import re
+    if re.search(r'\\x[0-9a-fA-F]{2}', s):
+        try:
+            s = re.sub(r'\\x([0-9a-fA-F]{2})', lambda m: chr(int(m.group(1), 16)), s)
+            s = s.encode('latin-1').decode('utf-8')
+        except Exception:
+            pass
+    else:
+        try:
+            s = s.encode("latin-1").decode("utf-8").strip()
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
     return s
 
 
