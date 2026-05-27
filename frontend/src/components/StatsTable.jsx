@@ -8,7 +8,6 @@ const COLUMNS_SKILL = [
   { key: "name", label: "Player", sortable: true },
   { key: "position", label: "Pos", sortable: true },
   { key: "team", label: "Tm", sortable: true },
-  { key: "season", label: "Yr", sortable: true, fromCurrent: true, type: "num" },
   { key: "games", label: "G", sortable: true, fromCurrent: true, type: "num" },
   { key: "pass_yds", label: "Pass Yd", sortable: true, fromCurrent: true, type: "num" },
   { key: "pass_td", label: "Pass TD", sortable: true, fromCurrent: true, type: "num" },
