@@ -51,7 +51,7 @@ export default function Stats() {
     setTeam("ALL");
     setSearch("");
     if (sport === "nba") setSeason("2025-26");
-    else if (sport === "mlb") setSeason(String(currentYear));
+    else if (sport === "mlb") setSeason(String(currentYear - 1));
     else setSeason(String(currentYear - 1));
   }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
