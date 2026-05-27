@@ -286,7 +286,10 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 logger.warning(f"No MLB pitching data for {season}")
                 continue
             logger.info(f"Fetched MLB pitching {season}: {len(df)} players")
-            
+            if season == current_year:
+                sample = df.iloc[0]
+                logger.info(f"MLB pitching {season} sample: Name={sample.get('Name','?')}, mlbID={sample.get('mlbID','?')}, cols={list(df.columns)[:10]}")
+
             if season == current_year:
                 logger.info(f"MLB pitching {season} sample: {df.iloc[0].get('Name','?')} mlbID={df.iloc[0].get('mlbID','?')} G={df.iloc[0].get('G','?')}")
             
