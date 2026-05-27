@@ -12,8 +12,8 @@ logger = logging.getLogger("ffref.nba")
 
 NBA_POSITIONS = {"PG", "SG", "SF", "PF", "C"}
 
-# Fantasy points scoring (standard points league)
-# PTS=1, REB=1.2, AST=1.5, STL=3, BLK=3, TO=-1, 3PM=0.5
+# ESPN default fantasy basketball scoring:
+# PTS=1, FGM=2, FGA=-1, FTM=1, FTA=-1, 3PM=1, REB=1, AST=2, STL=4, BLK=4, TOV=-2
 FP_WEIGHTS = {
     "pts": 1.0,
     "fgm": 2.0,
@@ -41,9 +41,9 @@ NBA_TEAMS = [
     ("TOR", "Toronto Raptors"), ("UTA", "Utah Jazz"), ("WAS", "Washington Wizards"),
 ]
 
-# Map full team names to abbreviations
 TEAM_NAME_TO_ABV = {name: abv for abv, name in NBA_TEAMS}
 TEAM_ABV_TO_NAME = {abv: name for abv, name in NBA_TEAMS}
+
 
 def _compute_fpts(row: dict) -> float:
     return round(
@@ -60,6 +60,7 @@ def _compute_fpts(row: dict) -> float:
         (row.get("tov") or 0) * -2.0,
         2
     )
+
 
 def _detect_nba_tag(seasons: list[dict], position: str) -> str | None:
     if not seasons:
@@ -88,22 +89,22 @@ def _detect_nba_tag(seasons: list[dict], position: str) -> str | None:
         return "sleeper"
     return None
 
+
 def _get_current_nba_season() -> str:
-    """Returns current NBA season in YYYY-YY format e.g. 2025-26"""
     now = datetime.now(timezone.utc)
     year = now.year
     month = now.month
-    # NBA season starts in October
     if month >= 10:
         return f"{year}-{str(year + 1)[-2:]}"
     else:
         return f"{year - 1}-{str(year)[-2:]}"
 
+
 def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
     """Fetch NBA player stats using nba_api."""
     try:
-        from nba_api.stats.endpoints import leaguedashplayerstats, commonallplayers
-        from nba_api.stats.static import players as nba_players_static
+        from nba_api.stats.endpoints import leaguedashplayerstats, commonteamroster
+        from nba_api.stats.static import teams as nba_teams_static
         import pandas as pd
         import time
     except ImportError:
@@ -117,11 +118,9 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
         for i in range(1, seasons_back)
     ]
 
-   # Build position lookup from team rosters
+    # Build position lookup from team rosters
     pos_lookup = {}
     try:
-        from nba_api.stats.endpoints import commonteamroster
-        from nba_api.stats.static import teams as nba_teams_static
         all_teams = nba_teams_static.get_teams()
         logger.info(f"Building NBA position lookup from {len(all_teams)} teams...")
         for team in all_teams:
@@ -135,6 +134,9 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                 if not dfs:
                     continue
                 roster_df = dfs[0]
+                if roster_df.empty:
+                    continue
+                logger.info(f"Team {team['abbreviation']} roster cols: {list(roster_df.columns)}, sample pos: {roster_df['POSITION'].iloc[0] if 'POSITION' in roster_df.columns else 'NO POS COL'}")
                 for _, row in roster_df.iterrows():
                     pid = str(row.get("PLAYER_ID", ""))
                     pos = str(row.get("POSITION", "") or "").strip().upper()
@@ -150,7 +152,7 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                         mapped = "SF"
                     elif pos == "PF":
                         mapped = "PF"
-                    elif pos in ("C",):
+                    elif pos == "C":
                         mapped = "C"
                     elif "G-F" in pos or "F-G" in pos:
                         mapped = "SG"
@@ -196,10 +198,7 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                 if games < 5:
                     continue
 
-                # Get position from lookup
-                pos = pos_lookup.get(pid, "")
-                if not pos:
-                    pos = "SF"  # default
+                pos = pos_lookup.get(pid, "SF")
 
                 pts = round(float(row.get("PTS", 0) or 0), 1)
                 reb = round(float(row.get("REB", 0) or 0), 1)
@@ -208,7 +207,6 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                 blk = round(float(row.get("BLK", 0) or 0), 1)
                 tov = round(float(row.get("TOV", 0) or 0), 1)
                 fg3m = round(float(row.get("FG3M", 0) or 0), 1)
-
                 fgm = round(float(row.get("FGM", 0) or 0), 1)
                 fga = round(float(row.get("FGA", 0) or 0), 1)
                 ftm = round(float(row.get("FTM", 0) or 0), 1)
@@ -232,9 +230,12 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                     "ft_pct": round(float(row.get("FT_PCT", 0) or 0) * 100, 1),
                     "min": round(float(row.get("MIN", 0) or 0), 1),
                 }
-                fpts = _compute_fpts({"pts": pts, "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta, "fg3m": fg3m, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov})
+                fpts = _compute_fpts({
+                    "pts": pts, "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta,
+                    "fg3m": fg3m, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov
+                })
                 season_rec["fpts"] = fpts
-                season_rec["fpts_per_game"] = fpts  # already per-game since stats are PerGame
+                season_rec["fpts_per_game"] = fpts
 
                 if pid not in all_player_seasons:
                     all_player_seasons[pid] = {
@@ -247,7 +248,6 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                     }
                 else:
                     all_player_seasons[pid]["team"] = team_abv
-                    # Update position if we have a better one
                     if pos != "SF":
                         all_player_seasons[pid]["position"] = pos
 
@@ -305,7 +305,6 @@ async def refresh_nba_data(db, *, force: bool = False) -> dict:
     if not players:
         return {"status": "error", "reason": "no_nba_data"}
 
-    # Delete old NBA players and reinsert
     await db.players.delete_many({"sport": "nba"})
     await db.players.insert_many(players)
 
