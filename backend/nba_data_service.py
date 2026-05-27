@@ -117,16 +117,54 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
         for i in range(1, seasons_back)
     ]
 
-   # Build position lookup from nba_api static player data
+   # Build position lookup from team rosters
     pos_lookup = {}
     try:
-        from nba_api.stats.static import players as nba_static_players
-        all_players = nba_static_players.get_active_players()
-        # Static data has: id, full_name, first_name, last_name, is_active
-        # No position in static — use LeagueDashPlayerStats POSITION column if available
-        logger.info(f"NBA static players: {len(all_players)}")
+        from nba_api.stats.endpoints import commonteamroster
+        from nba_api.stats.static import teams as nba_teams_static
+        all_teams = nba_teams_static.get_teams()
+        logger.info(f"Building NBA position lookup from {len(all_teams)} teams...")
+        for team in all_teams:
+            try:
+                time.sleep(0.5)
+                roster = commonteamroster.CommonTeamRoster(
+                    team_id=str(team["id"]),
+                    season=current_season
+                )
+                dfs = roster.get_data_frames()
+                if not dfs:
+                    continue
+                roster_df = dfs[0]
+                for _, row in roster_df.iterrows():
+                    pid = str(row.get("PLAYER_ID", ""))
+                    pos = str(row.get("POSITION", "") or "").strip().upper()
+                    if not pid:
+                        continue
+                    if not pos:
+                        mapped = "SF"
+                    elif pos in ("PG", "G"):
+                        mapped = "PG"
+                    elif pos == "SG":
+                        mapped = "SG"
+                    elif pos in ("SF", "F"):
+                        mapped = "SF"
+                    elif pos == "PF":
+                        mapped = "PF"
+                    elif pos in ("C",):
+                        mapped = "C"
+                    elif "G-F" in pos or "F-G" in pos:
+                        mapped = "SG"
+                    elif "F-C" in pos or "C-F" in pos:
+                        mapped = "PF"
+                    else:
+                        mapped = "SF"
+                    pos_lookup[pid] = mapped
+            except Exception as team_err:
+                logger.warning(f"NBA roster fetch failed for {team['abbreviation']}: {team_err}")
+                continue
+        logger.info(f"NBA position lookup built: {len(pos_lookup)} players")
     except Exception as e:
-        logger.warning(f"NBA static lookup failed: {e}")
+        logger.warning(f"NBA position lookup failed: {e}")
 
     all_player_seasons: dict[str, dict] = {}
 
