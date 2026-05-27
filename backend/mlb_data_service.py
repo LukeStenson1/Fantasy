@@ -33,6 +33,46 @@ MLB_TEAM_NAME_TO_ABV = {
 MLB_BATTER_POSITIONS = {"C", "1B", "2B", "3B", "SS", "OF", "DH"}
 MLB_PITCHER_POSITIONS = {"SP", "RP"}
 
+def _fetch_mlb_positions() -> dict:
+    """Fetch player positions from MLB Stats API."""
+    import urllib.request
+    import json
+    pos_lookup = {}
+    try:
+        url = "https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        for player in data.get("people", []):
+            mlb_id = player.get("id")
+            pos = player.get("primaryPosition", {}).get("abbreviation", "")
+            if mlb_id and pos:
+                # Normalize position
+                if pos in ("C",):
+                    mapped = "C"
+                elif pos in ("1B",):
+                    mapped = "1B"
+                elif pos in ("2B",):
+                    mapped = "2B"
+                elif pos in ("3B",):
+                    mapped = "3B"
+                elif pos in ("SS",):
+                    mapped = "SS"
+                elif pos in ("DH",):
+                    mapped = "DH"
+                elif pos in ("LF", "CF", "RF", "OF"):
+                    mapped = "OF"
+                elif pos in ("SP", "P"):
+                    mapped = "SP"
+                elif pos in ("RP",):
+                    mapped = "RP"
+                else:
+                    mapped = "OF"
+                pos_lookup[str(mlb_id)] = mapped
+        logger.info(f"MLB position lookup: {len(pos_lookup)} players")
+    except Exception as e:
+        logger.warning(f"MLB position lookup failed: {e}")
+    return pos_lookup
 
 def _normalize_mlb_team(tm: str, lev: str = "") -> str:
     """Convert full team name to abbreviation using Lev to disambiguate."""
