@@ -387,6 +387,10 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         })
 
+    except Exception as e:
+            logger.warning(f"MLB build error for {pid}: {e}")
+            continue
+
     logger.info(f"MLB players built: {len(final)}")
     return final
 
