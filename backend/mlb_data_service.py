@@ -9,6 +9,18 @@ from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger("ffref.mlb")
 
+MLB_TEAM_NAME_TO_ABV = {
+    "Arizona": "ARI", "Atlanta": "ATL", "Baltimore": "BAL", "Boston": "BOS",
+    "Chicago": "CHC", "Chicago": "CWS", "Cincinnati": "CIN", "Cleveland": "CLE",
+    "Colorado": "COL", "Detroit": "DET", "Houston": "HOU", "Kansas City": "KC",
+    "Los Angeles": "LAD", "Miami": "MIA", "Milwaukee": "MIL", "Minnesota": "MIN",
+    "New York": "NYM", "Oakland": "OAK", "Philadelphia": "PHI", "Pittsburgh": "PIT",
+    "San Diego": "SD", "San Francisco": "SF", "Seattle": "SEA", "St. Louis": "STL",
+    "Tampa Bay": "TB", "Texas": "TEX", "Toronto": "TOR", "Washington": "WSH",
+    "Cubs": "CHC", "White Sox": "CWS", "Yankees": "NYY", "Mets": "NYM",
+    "Dodgers": "LAD", "Angels": "LAA", "Athletics": "OAK",
+}
+
 MLB_BATTER_POSITIONS = {"C", "1B", "2B", "3B", "SS", "OF", "DH"}
 MLB_PITCHER_POSITIONS = {"SP", "RP"}
 
