@@ -349,8 +349,8 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
                       <td className="font-mono-tab">{s.HR ?? "—"}</td>
                       <td className="font-mono-tab">{s.RBI ?? "—"}</td>
                       <td className="font-mono-tab">{s.SB ?? "—"}</td>
-                      <td className="font-mono-tab">{s.AVG ?? "—"}</td>
-                      <td className="font-mono-tab">{s.OPS ?? "—"}</td>
+                      <td className="font-mono-tab">{s.AVG != null ? s.AVG.toFixed(3).replace(/^0\./, ".") : "—"}</td>
+                      <td className="font-mono-tab">{s.OPS != null ? s.OPS.toFixed(3).replace(/^0\./, ".") : "—"}</td>
                     </>}
                     {sport === "nfl" && !isK && <>
                       <td className="font-mono-tab">{s.pass_yds?.toLocaleString() || "—"}</td>
