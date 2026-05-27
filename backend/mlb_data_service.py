@@ -206,7 +206,11 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
             logger.info(f"Fetched MLB pitching {season}: {len(df)} players")
 
             for _, row in df.iterrows():
-                name = str(row.get("Name", "") or "")
+                raw_name = row.get("Name", "") or ""
+                if isinstance(raw_name, bytes):
+                    name = raw_name.decode("utf-8", errors="replace")
+                else:
+                    name = str(raw_name).encode("utf-8", errors="replace").decode("utf-8", errors="replace")
                 team = str(row.get("Tm", "") or row.get("Team", "") or "").strip()
                 games = safe_int(row.get("G"))
                 gs = safe_int(row.get("GS"))
