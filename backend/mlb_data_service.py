@@ -278,7 +278,10 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 logger.warning(f"No MLB pitching data for {season}")
                 continue
             logger.info(f"Fetched MLB pitching {season}: {len(df)} players")
-
+            
+            if season == current_year:
+                logger.info(f"MLB pitching {season} sample: {df.iloc[0].get('Name','?')} mlbID={df.iloc[0].get('mlbID','?')} G={df.iloc[0].get('G','?')}")
+            
             for _, row in df.iterrows():
                 name = _fix_name_encoding(row.get("Name", ""))
                 if not name:
