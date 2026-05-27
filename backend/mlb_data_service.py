@@ -295,8 +295,10 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 if mlb_id and not (isinstance(mlb_id, float) and math.isnan(mlb_id)):
                     pid = f"PIT_{int(mlb_id)}"
                 else:
-                    pid = f"PIT_{name.replace(' ', '_')}_{team}"
-
+                    # Normalize name for consistent pid across seasons
+                    import unicodedata
+                    name_normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+                    pid = f"PIT_{name_normalized.replace(' ', '_')}_{team}"
                 pos = "SP" if gs >= games * 0.5 else "RP"
 
                 ip_raw = row.get("IP", 0) or 0
