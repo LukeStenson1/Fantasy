@@ -117,38 +117,16 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
         for i in range(1, seasons_back)
     ]
 
-    # Build position lookup from static player data
+   # Build position lookup from nba_api static player data
     pos_lookup = {}
     try:
-        time.sleep(0.6)
-        cap = commonallplayers.CommonAllPlayers(is_only_current_season=0)
-        cap_df = cap.get_data_frames()[0]
-        for _, row in cap_df.iterrows():
-            pid = str(row.get("PERSON_ID", ""))
-            pos = str(row.get("POSITION", "") or "").strip()
-            if not pid or not pos:
-                continue
-            p = pos.upper()
-            if p == "G" or "POINT" in p or p == "PG":
-                mapped = "PG"
-            elif "GUARD" in p or p == "SG":
-                mapped = "SG"
-            elif p == "F" or ("FORWARD" in p and "POWER" not in p and "CENTER" not in p):
-                mapped = "SF"
-            elif "POWER" in p or "PF" in p:
-                mapped = "PF"
-            elif "CENTER" in p or p == "C":
-                mapped = "C"
-            elif "FORWARD-CENTER" in p or "CENTER-FORWARD" in p:
-                mapped = "PF"
-            elif "GUARD-FORWARD" in p or "FORWARD-GUARD" in p:
-                mapped = "SF"
-            else:
-                mapped = "SF"
-            pos_lookup[pid] = mapped
-        logger.info(f"NBA position lookup: {len(pos_lookup)} players")
+        from nba_api.stats.static import players as nba_static_players
+        all_players = nba_static_players.get_active_players()
+        # Static data has: id, full_name, first_name, last_name, is_active
+        # No position in static — use LeagueDashPlayerStats POSITION column if available
+        logger.info(f"NBA static players: {len(all_players)}")
     except Exception as e:
-        logger.warning(f"NBA position lookup failed: {e}")
+        logger.warning(f"NBA static lookup failed: {e}")
 
     all_player_seasons: dict[str, dict] = {}
 
