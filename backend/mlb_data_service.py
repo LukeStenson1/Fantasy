@@ -209,7 +209,8 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
         try:
             df = batting_stats(season)
             if df is not None and not df.empty:
-                df = df[df["G"] >= 20]
+                min_games = 10 if season == current_year else 20
+                df = df[df["G"] >= min_games]
             if df is None or df.empty:
                 logger.warning(f"No MLB batting data for {season}")
                 continue
