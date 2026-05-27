@@ -207,8 +207,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
             url = (
                 f"https://statsapi.mlb.com/api/v1/stats"
                 f"?stats=season&season={season}&group=hitting"
-                f"&gameType=R&limit=1000&offset=0"
-                f"&fields=stats,splits,stat,player,team,season"
+                f"&gameType=R&playerPool=ALL&limit=2000"
             )
             data = mlb_api_get(url)
             splits = data.get("stats", [{}])[0].get("splits", [])
