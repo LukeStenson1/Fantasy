@@ -211,6 +211,9 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
             )
             data = mlb_api_get(url)
             splits = data.get("stats", [{}])[0].get("splits", [])
+            if season == current_year and splits:
+                sample = splits[0]
+                logger.info(f"MLB API batter sample: player={sample.get('player',{}).get('fullName')}, team={sample.get('team',{})}, stat_keys={list(sample.get('stat',{}).keys())[:10]}")
             logger.info(f"Fetched MLB batting {season}: {len(splits)} players")
 
             for split in splits:
