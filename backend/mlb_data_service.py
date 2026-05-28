@@ -9,25 +9,18 @@ from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger("ffref.mlb")
 
-# Map full city/team names from Baseball Reference to abbreviations
 MLB_TEAM_NAME_TO_ABV = {
-    "Arizona": "ARI", "Atlanta": "ATL", "Baltimore": "BAL", "Boston": "BOS",
-    "Cincinnati": "CIN", "Cleveland": "CLE", "Colorado": "COL", "Detroit": "DET",
-    "Houston": "HOU", "Kansas City": "KC", "Miami": "MIA", "Milwaukee": "MIL",
-    "Minnesota": "MIN", "Oakland": "OAK", "Philadelphia": "PHI", "Pittsburgh": "PIT",
-    "San Diego": "SD", "San Francisco": "SF", "Seattle": "SEA", "St. Louis": "STL",
-    "Tampa Bay": "TB", "Texas": "TEX", "Toronto": "TOR", "Washington": "WSH",
-    # AL/NL disambiguation
-    "Chicago": "CHC",      # default Chicago to Cubs; White Sox handled below
-    "Los Angeles": "LAD",  # default LA to Dodgers; Angels handled below
-    "New York": "NYM",     # default NY to Mets; Yankees handled below
-    # Full team names
-    "Cubs": "CHC", "White Sox": "CWS", "Yankees": "NYY", "Mets": "NYM",
-    "Dodgers": "LAD", "Angels": "LAA", "Athletics": "OAK",
-    # Lev-based disambiguation keys (used with Lev column)
-    "Chicago-AL": "CWS", "Chicago-NL": "CHC",
-    "Los Angeles-AL": "LAA", "Los Angeles-NL": "LAD",
-    "New York-AL": "NYY", "New York-NL": "NYM",
+    "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL",
+    "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CWS",
+    "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL",
+    "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC",
+    "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA",
+    "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM",
+    "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI",
+    "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
+    "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
+    "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
+    "Athletics": "OAK", "Cleveland Indians": "CLE",
 }
 
 MLB_BATTER_POSITIONS = {"C", "1B", "2B", "3B", "SS", "OF", "DH"}
