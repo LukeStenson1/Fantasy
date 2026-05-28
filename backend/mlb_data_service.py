@@ -290,7 +290,8 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                     continue
 
                 name = player.get("fullName", "")
-                team_abv = team.get("abbreviation", "")
+                team_name = team.get("name", "")
+                team_abv = MLB_TEAM_NAME_TO_ABV.get(team_name, team.get("abbreviation", ""))
                 games = safe_int(stat.get("gamesPlayed"))
                 gs = safe_int(stat.get("gamesStarted"))
 
