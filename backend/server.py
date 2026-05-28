@@ -232,10 +232,12 @@ async def list_players(
                 p["matchup_def_rank"] = dvp.get("rank", 16)
                 p["matchup_def_fpts_allowed"] = dvp.get("fpts_allowed_per_game")
                 p["matchup_def_source"] = dvp.get("source")
-    # For NBA/MLB, show all players; for NFL only show players with current_season unless explicitly filtered
     is_nfl = not sport or sport == "nfl"
-    has_explicit_filter = bool(search) or position in ("DEF", "K") or tag is not None or not is_nfl
-    if not has_explicit_filter:
+    has_explicit_filter = bool(search) or position in ("DEF", "K") or tag is not None
+    if is_nfl and not has_explicit_filter:
+        items = [p for p in items if p.get("current_season")]
+    elif not is_nfl:
+        # For NBA/MLB, only show players who have data for the requested season
         items = [p for p in items if p.get("current_season")]
     reverse = direction == "desc"
     def keyfn(p):
