@@ -341,6 +341,7 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
                       <td className="font-mono-tab">{s.W ?? "—"}</td>
                       <td className="font-mono-tab">{s.SV ?? "—"}</td>
                       <td className="font-mono-tab">{s.SO ?? "—"}</td>
+                      <td className="font-mono-tab">{s.H ?? "—"}</td>
                       <td className="font-mono-tab">{s.ERA ?? "—"}</td>
                       <td className="font-mono-tab">{s.WHIP ?? "—"}</td>
                     </>}
