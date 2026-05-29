@@ -226,8 +226,8 @@ def _fetch_nba_players_sync(seasons_back: int = 3) -> list[dict]:
                     "pts": pts, "fgm": fgm, "fga": fga, "ftm": ftm, "fta": fta,
                     "fg3m": fg3m, "reb": reb, "ast": ast, "stl": stl, "blk": blk, "tov": tov
                 })
-                season_rec["fpts"] = round(fpts * games, 1)  # total season FPts
-                season_rec["fpts_per_game"] = fpts  # per game
+                season_rec["fpts"] = round(fpts * games, 1)
+                season_rec["fpts_per_game"] = fpts
 
                 if pid not in all_player_seasons:
                     all_player_seasons[pid] = {
