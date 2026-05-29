@@ -344,7 +344,7 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
                       <td className="font-mono-tab">{s.WHIP ?? "—"}</td>
                     </>}
                     {sport === "mlb" && full.player_type !== "pitcher" && <>
-                      <td className="font-mono-tab">{s.H ?? "—"}</td>
+                      <td className="font-mono-tab">{s.H ?? "—"}</td>{/* HA = Hits Allowed */}
                       <td className="font-mono-tab">{s.R ?? "—"}</td>
                       <td className="font-mono-tab">{s.HR ?? "—"}</td>
                       <td className="font-mono-tab">{s.RBI ?? "—"}</td>
