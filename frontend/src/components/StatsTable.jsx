@@ -73,7 +73,7 @@ const COLUMNS_MLB_BATTER = [
   { key: "position", label: "Pos", sortable: true },
   { key: "team", label: "Tm", sortable: true },
   { key: "G", label: "G", sortable: true, fromCurrent: true, type: "num" },
-  { key: "H", label: "H", sortable: true, fromCurrent: true, type: "num" },
+  { key: "H", label: "HA", sortable: true, fromCurrent: true, type: "num" },
   { key: "R", label: "R", sortable: true, fromCurrent: true, type: "num" },
   { key: "HR", label: "HR", sortable: true, fromCurrent: true, type: "num" },
   { key: "RBI", label: "RBI", sortable: true, fromCurrent: true, type: "num" },
