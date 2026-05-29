@@ -43,9 +43,10 @@ export default function Navbar() {
               onClick={() => setSport(s.id)}
               className={`px-3 py-1 text-xs font-bold tracking-widest uppercase rounded-md transition-all ${
                 sport === s.id
-                  ? "bg-emerald-500 text-slate-950"
+                  ? `text-slate-950`
                   : "text-slate-400 hover:text-white"
               }`}
+              style={sport === s.id ? { backgroundColor: SPORT_CONFIG[s.id].hex } : {}}
             >
               {s.label}
             </button>
