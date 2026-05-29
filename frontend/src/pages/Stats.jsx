@@ -67,8 +67,8 @@ export default function Stats() {
   const params = useMemo(() => {
     let pos = position;
     let playerType = undefined;
-    if (position === "ALL HITTERS") { pos = "ALL"; playerType = "batter"; }
-    if (position === "ALL PITCHERS") { pos = "ALL"; playerType = "pitcher"; }
+    if (position === "Hitters") { pos = "ALL"; playerType = "batter"; }
+    if (position === "Pitchers") { pos = "ALL"; playerType = "pitcher"; }
     return {
       position: pos,
       team,
