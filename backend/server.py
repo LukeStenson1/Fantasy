@@ -204,6 +204,7 @@ async def list_players(
     limit: int = Query(default=300, le=1000),
     tag: Optional[str] = None,
     sport: Optional[str] = None,
+    player_type: Optional[str] = None,
 ):
     q = {}
     if sport and sport != "nfl":
