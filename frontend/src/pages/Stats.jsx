@@ -16,7 +16,7 @@ import { X } from "lucide-react";
 
 const NFL_POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"];
 const NBA_POSITIONS = ["ALL", "PG", "SG", "SF", "PF", "C"];
-const MLB_POSITIONS = ["ALL HITTERS", "ALL PITCHERS", "C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"];
+const MLB_POSITIONS = ["HITTERS", "PITCHERS", "C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"];
 
 const SCORINGS = [
   { v: "half_ppr", l: "Half PPR" },
@@ -47,7 +47,7 @@ export default function Stats() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setPosition("ALL");
+    setPosition(sport === "mlb" ? "HITTERS" : "ALL");
     setTeam("ALL");
     setSearch("");
     if (sport === "nba") setSeason("2025-26");
