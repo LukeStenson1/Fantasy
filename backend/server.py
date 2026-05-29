@@ -211,7 +211,8 @@ async def list_players(
         q["sport"] = sport
     else:
         q["sport"] = {"$not": {"$in": ["nba", "mlb"]}}
-    # For NFL (default), don't filter by sport at all — NFL players may not have sport field
+    if player_type:
+        q["player_type"] = player_type
     if position and position != "ALL":
         q["position"] = position
     if team and team != "ALL":
