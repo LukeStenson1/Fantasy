@@ -64,15 +64,22 @@ export default function Stats() {
       .catch(() => setTeams([]));
   }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const params = useMemo(() => ({
-    position,
-    team,
-    season: sport === "nba" ? season : Number(season),
-    scoring,
-    search: search || undefined,
-    sport,
-    limit: 500,
-  }), [position, team, season, scoring, search, sport]);
+  const params = useMemo(() => {
+    let pos = position;
+    let playerType = undefined;
+    if (position === "ALL HITTERS") { pos = "ALL"; playerType = "batter"; }
+    if (position === "ALL PITCHERS") { pos = "ALL"; playerType = "pitcher"; }
+    return {
+      position: pos,
+      team,
+      season: sport === "nba" ? season : Number(season),
+      scoring,
+      search: search || undefined,
+      sport,
+      player_type: playerType,
+      limit: 500,
+    };
+  }, [position, team, season, scoring, search, sport]);
 
   useEffect(() => {
     if (!season) return;
