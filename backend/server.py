@@ -170,7 +170,16 @@ def _attach_current_season(p: dict, season, scoring: str) -> dict:
         p["current_fpts_per_game"] = 0
         return p
     if season:
-        match = next((s for s in seasons if str(s.get("season", "")) == str(season)), None) or seasons[-1]
+        match = next((s for s in seasons if str(s.get("season", "")) == str(season)), None)
+        if match is None:
+            if sport == "nfl":
+                match = seasons[-1]  # NFL falls back to latest
+            else:
+                # NBA/MLB — no fallback, player doesn't have this season
+                p["current_season"] = None
+                p["current_fpts"] = 0
+                p["current_fpts_per_game"] = 0
+                return p
     else:
         match = seasons[-1]
     p["current_season"] = match
