@@ -93,6 +93,7 @@ const COLUMNS_MLB_PITCHER = [
   { key: "W", label: "W", sortable: true, fromCurrent: true, type: "num" },
   { key: "SV", label: "SV", sortable: true, fromCurrent: true, type: "num" },
   { key: "SO", label: "K", sortable: true, fromCurrent: true, type: "num" },
+  { key: "H", label: "HA", sortable: true, fromCurrent: true, type: "num" },
   { key: "ERA", label: "ERA", sortable: true, fromCurrent: true, type: "num" },
   { key: "WHIP", label: "WHIP", sortable: true, fromCurrent: true, type: "num" },
   { key: "current_fpts", label: "FPts", sortable: true, type: "num", emphasize: true },
