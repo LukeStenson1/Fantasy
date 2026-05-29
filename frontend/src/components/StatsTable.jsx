@@ -314,7 +314,7 @@ function ExpandedContent({ player, scoring, sport = "nfl" }) {
               <thead><tr>
                 <th>Season</th><th>G</th>
                 {sport === "nba" && <><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>3PM</th><th>FG%</th><th>FT%</th></>}
-                {sport === "mlb" && full.player_type === "pitcher" && <><th>IP</th><th>W</th><th>SV</th><th>K</th><th>ERA</th><th>WHIP</th></>}
+                {sport === "mlb" && full.player_type === "pitcher" && <><th>IP</th><th>W</th><th>SV</th><th>K</th><th>HA</th><th>ERA</th><th>WHIP</th></>}
                 {sport === "mlb" && full.player_type !== "pitcher" && <><th>HA</th><th>R</th><th>HR</th><th>RBI</th><th>SB</th><th>AVG</th><th>OPS</th></>}
                 {sport === "nfl" && !isK && <><th>Pass Yd</th><th>Pass TD</th><th>INT</th><th>Rush Yd</th><th>Rush TD</th><th>Rec</th><th>Tgt</th><th>Rec Yd</th><th>Rec TD</th></>}
                 {sport === "nfl" && isK && <><th>FGM</th><th>FGA</th><th>FG%</th><th>40-49</th><th>50-59</th><th>60+</th><th>PAT</th></>}
