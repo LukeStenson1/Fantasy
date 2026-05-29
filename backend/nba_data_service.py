@@ -16,16 +16,12 @@ NBA_POSITIONS = {"PG", "SG", "SF", "PF", "C"}
 # PTS=1, FGM=2, FGA=-1, FTM=1, FTA=-1, 3PM=1, REB=1, AST=2, STL=4, BLK=4, TOV=-2
 FP_WEIGHTS = {
     "pts": 1.0,
-    "fgm": 2.0,
-    "fga": -1.0,
-    "ftm": 1.0,
-    "fta": -1.0,
-    "fg3m": 1.0,
-    "reb": 1.0,
-    "ast": 2.0,
-    "stl": 4.0,
-    "blk": 4.0,
-    "tov": -2.0,
+    "reb": 1.2,
+    "ast": 1.5,
+    "stl": 3.0,
+    "blk": 3.0,
+    "tov": -1.0,
+    "fg3m": 0.5,
 }
 
 NBA_TEAMS = [
@@ -48,16 +44,12 @@ TEAM_ABV_TO_NAME = {abv: name for abv, name in NBA_TEAMS}
 def _compute_fpts(row: dict) -> float:
     return round(
         (row.get("pts") or 0) * 1.0 +
-        (row.get("fgm") or 0) * 2.0 +
-        (row.get("fga") or 0) * -1.0 +
-        (row.get("ftm") or 0) * 1.0 +
-        (row.get("fta") or 0) * -1.0 +
-        (row.get("fg3m") or 0) * 1.0 +
-        (row.get("reb") or 0) * 1.0 +
-        (row.get("ast") or 0) * 2.0 +
-        (row.get("stl") or 0) * 4.0 +
-        (row.get("blk") or 0) * 4.0 +
-        (row.get("tov") or 0) * -2.0,
+        (row.get("reb") or 0) * 1.2 +
+        (row.get("ast") or 0) * 1.5 +
+        (row.get("stl") or 0) * 3.0 +
+        (row.get("blk") or 0) * 3.0 +
+        (row.get("tov") or 0) * -1.0 +
+        (row.get("fg3m") or 0) * 0.5,
         2
     )
 
