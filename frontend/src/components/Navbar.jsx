@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSport } from "../contexts/SportContext";
+import { SPORT_CONFIG } from "../contexts/SportContext";
 import { Button } from "./ui/button";
 import { LogOut, User as UserIcon } from "lucide-react";
 
