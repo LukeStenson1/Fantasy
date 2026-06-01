@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import { api } from "../lib/api";
 import AdSlot from "../components/AdSlot";
 import { PositionBadge } from "../components/Badges";
+import { useSport } from "../contexts/SportContext";
 import {
   Select,
   SelectContent,
@@ -27,16 +28,16 @@ const TAG_STYLES = {
 };
 
 const TAG_LABELS = {
-  elite:    "ELITE",
-  breakout: "BREAKOUT",
-  sleeper:  "SLEEPER",
-  risk:     "BUST RISK",
+  elite: "ELITE", breakout: "BREAKOUT", sleeper: "SLEEPER", risk: "BUST RISK",
 };
+
+const NFL_POSITIONS = ["RB", "WR", "QB", "TE", "DEF"];
 
 const safeObject = (v, fallback = {}) =>
   v && typeof v === "object" ? v : fallback;
 
 export default function Home() {
+  const { sport, config } = useSport();
   const [scoring, setScoring] = useState("half_ppr");
   const [summary, setSummary] = useState({ total_players: 0, data_seasons: [], last_refresh: null });
   const [movers, setMovers] = useState({ sleepers: [], busts: [], breakouts: [], elites: [] });
@@ -44,12 +45,8 @@ export default function Home() {
   const [loadingMovers, setLoadingMovers] = useState(true);
 
   useEffect(() => {
-    api.get("/stats/summary")
-      .then((r) => setSummary(safeObject(r.data)))
-      .catch(() => {});
-    api.get("/matchups/this-week")
-      .then((r) => setMatchups(safeObject(r.data)))
-      .catch(() => {});
+    api.get("/stats/summary").then((r) => setSummary(safeObject(r.data))).catch(() => {});
+    api.get("/matchups/this-week").then((r) => setMatchups(safeObject(r.data))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -68,7 +65,8 @@ export default function Home() {
   }, [scoring]);
 
   const byPos = matchups?.by_position ?? {};
-  const week  = matchups?.week;
+  const week = matchups?.week;
+  const isNFL = sport === "nfl";
 
   return (
     <div className="min-h-screen bg-[#0a0e16]">
@@ -78,61 +76,101 @@ export default function Home() {
       <div className="border-b border-slate-800 bg-slate-950/60">
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-2">◆ The Lab · Command Center</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white">Dashboard</h1>
+            <div
+              className="text-[10px] font-bold tracking-[0.25em] uppercase mb-2"
+              style={{ color: config.hex }}
+            >
+              ◆ The Lab · Command Center
+            </div>
+            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white">
+              Dashboard
+            </h1>
             <p className="text-slate-400 mt-2">
               {summary.total_players > 0
                 ? `${summary.total_players} players · seasons ${(summary.data_seasons || []).join(", ")}`
                 : "Live fantasy intelligence"}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 uppercase tracking-widest">Scoring</span>
-            <Select value={scoring} onValueChange={setScoring}>
-              <SelectTrigger className="w-[130px] bg-slate-900 text-white border-slate-700">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SCORINGS.map((s) => (
-                  <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isNFL && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400 uppercase tracking-widest">Scoring</span>
+              <Select value={scoring} onValueChange={setScoring}>
+                <SelectTrigger className="w-[130px] bg-slate-900 text-white border-slate-700">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCORINGS.map((s) => (
+                    <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* MATCHUPS */}
-      <section className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white font-bold text-lg tracking-tight">
-            This Week's Matchups
-            {week ? <span className="ml-2 text-slate-500 text-sm font-normal">Week {week}</span> : null}
-          </h2>
-          <Link to="/stats" className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
-            All players <ChevronRight className="w-3 h-3" />
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {["RB", "WR", "QB", "TE", "DEF"].map((pos) => (
-            <MatchupColumn key={pos} pos={pos} data={byPos[pos] || { soft: [], tough: [] }} />
-          ))}
-        </div>
-      </section>
+      {/* NFL MATCHUPS */}
+      {isNFL && (
+        <section className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white font-bold text-lg tracking-tight">
+              This Week's Matchups
+              {week ? <span className="ml-2 text-slate-500 text-sm font-normal">Week {week}</span> : null}
+            </h2>
+            <Link to="/stats" className="text-xs flex items-center gap-1 hover:opacity-80" style={{ color: config.hex }}>
+              All players <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {NFL_POSITIONS.map((pos) => (
+              <MatchupColumn key={pos} pos={pos} data={byPos[pos] || { soft: [], tough: [] }} config={config} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* NBA/MLB — sport message when matchups not available */}
+      {!isNFL && (
+        <section className="max-w-7xl mx-auto px-4 py-8">
+          <div
+            className="rounded-lg border p-6 text-center"
+            style={{ borderColor: config.hexBorder, background: config.hexAlpha }}
+          >
+            <div className="text-2xl mb-2">
+              {sport === "nba" ? "🏀" : "⚾"}
+            </div>
+            <div className="font-bold text-white text-lg mb-1">
+              {sport === "nba" ? "NBA Season 2025-26" : "MLB Season 2026"}
+            </div>
+            <div className="text-slate-400 text-sm">
+              {sport === "nba"
+                ? "Playoffs are underway. Check the Stats page for full season leaders and fantasy analysis."
+                : "Season in progress. Check the Stats page for current batting and pitching leaders."}
+            </div>
+            <Link
+              to="/stats"
+              className="inline-flex items-center gap-1 mt-4 text-sm font-semibold hover:opacity-80"
+              style={{ color: config.hex }}
+            >
+              View Stats <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* MOVERS */}
       <section className="max-w-7xl mx-auto px-4 pb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-white font-bold text-lg tracking-tight">Players to Watch</h2>
-          <Link to="/draft-board" className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+          <Link to="/draft-board" className="text-xs flex items-center gap-1 hover:opacity-80" style={{ color: config.hex }}>
             Full analysis <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <MoverList title="Breakout Candidates" icon={<Zap className="w-4 h-4 text-blue-400" />} players={movers.breakouts} tag="breakout" loading={loadingMovers} scoring={scoring} />
-          <MoverList title="Elite Producers" icon={<Star className="w-4 h-4 text-emerald-400" />} players={movers.elites} tag="elite" loading={loadingMovers} scoring={scoring} />
-          <MoverList title="Sleeper Picks" icon={<TrendingUp className="w-4 h-4 text-violet-400" />} players={movers.sleepers} tag="sleeper" loading={loadingMovers} scoring={scoring} />
-          <MoverList title="Bust Risks" icon={<TrendingDown className="w-4 h-4 text-red-400" />} players={movers.busts} tag="risk" loading={loadingMovers} scoring={scoring} />
+          <MoverList title="Breakout Candidates" icon={<Zap className="w-4 h-4 text-blue-400" />} players={movers.breakouts} tag="breakout" loading={loadingMovers} scoring={scoring} config={config} />
+          <MoverList title="Elite Producers" icon={<Star className="w-4 h-4" style={{ color: config.hex }} />} players={movers.elites} tag="elite" loading={loadingMovers} scoring={scoring} config={config} />
+          <MoverList title="Sleeper Picks" icon={<TrendingUp className="w-4 h-4 text-violet-400" />} players={movers.sleepers} tag="sleeper" loading={loadingMovers} scoring={scoring} config={config} />
+          <MoverList title="Bust Risks" icon={<TrendingDown className="w-4 h-4 text-red-400" />} players={movers.busts} tag="risk" loading={loadingMovers} scoring={scoring} config={config} />
         </div>
       </section>
 
@@ -143,7 +181,7 @@ export default function Home() {
   );
 }
 
-function MatchupColumn({ pos, data }) {
+function MatchupColumn({ pos, data, config }) {
   const soft  = data?.soft  || [];
   const tough = data?.tough || [];
 
@@ -154,7 +192,7 @@ function MatchupColumn({ pos, data }) {
         <span className="text-white font-bold text-sm">{pos} Matchups</span>
       </div>
       <div className="px-4 pt-3 pb-1">
-        <div className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase mb-2">✦ Smash</div>
+        <div className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: config.hex }}>✦ Smash</div>
         {soft.slice(0, 3).map((r, i) => (
           <div key={i} className="flex items-center justify-between py-1.5 border-b border-slate-800/50 last:border-0">
             <div className="flex items-center gap-2">
@@ -163,7 +201,7 @@ function MatchupColumn({ pos, data }) {
               <span className="text-xs text-slate-500">vs {r.opp_team || "—"}</span>
             </div>
             {r.fpts_allowed_per_game != null && (
-              <span className="text-xs text-emerald-400 font-mono">{r.fpts_allowed_per_game.toFixed(1)}</span>
+              <span className="text-xs font-mono" style={{ color: config.hex }}>{r.fpts_allowed_per_game.toFixed(1)}</span>
             )}
           </div>
         ))}
@@ -189,7 +227,7 @@ function MatchupColumn({ pos, data }) {
   );
 }
 
-function MoverList({ title, icon, players = [], tag, loading, scoring }) {
+function MoverList({ title, icon, players = [], tag, loading, scoring, config }) {
   const safePlayers = Array.isArray(players) ? players : [];
   const fppgKey = `fpts_per_game_${scoring}`;
 
@@ -217,7 +255,7 @@ function MoverList({ title, icon, players = [], tag, loading, scoring }) {
               <span className="text-xs text-slate-600 w-4 shrink-0">{i + 1}</span>
               <PositionBadge position={p.position} />
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-white font-semibold truncate group-hover:text-emerald-400 transition-colors">
+                <div className="text-sm text-white font-semibold truncate transition-colors group-hover:opacity-80" style={{ '--hover-color': config.hex }}>
                   {p.name}
                 </div>
                 <div className="text-xs text-slate-500">{p.team}{season ? ` · ${season}` : ""}</div>
