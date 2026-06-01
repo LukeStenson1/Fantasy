@@ -62,7 +62,7 @@ export default function Home() {
       })
       .catch(() => {})
       .finally(() => setLoadingMovers(false));
-  }, [scoring]);
+  }, [scoring, sport]);
 
   const byPos = matchups?.by_position ?? {};
   const week = matchups?.week;
