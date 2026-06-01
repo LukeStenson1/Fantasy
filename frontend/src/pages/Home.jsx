@@ -51,7 +51,7 @@ export default function Home() {
 
   useEffect(() => {
     setLoadingMovers(true);
-    api.get("/sleepers-busts", { params: { scoring } })
+    api.get("/sleepers-busts", { params: { scoring, sport } })
       .then((r) => {
         setMovers({
           sleepers:  r.data?.sleepers  || [],
