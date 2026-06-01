@@ -315,8 +315,20 @@ async def regenerate_outlook(player_id: str, scoring: Literal["standard", "half_
 
 # ---------- Sleepers / Busts ----------
 @api.get("/sleepers-busts")
-async def sleepers_busts(scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr"):
-    cursor = db.players.find({"tag": {"$ne": None}}, {"_id": 0, "news": 0})
+async def sleepers_busts(
+    scoring: Literal["standard", "half_ppr", "ppr"] = "half_ppr",
+    sport: Optional[str] = None,
+):
+    q: dict = {"tag": {"$ne": None}}
+    if sport and sport != "nfl":
+        q["sport"] = sport
+    else:
+        q["$or"] = [
+            {"sport": {"$exists": False}},
+            {"sport": None},
+            {"sport": "nfl"},
+        ]
+    cursor = db.players.find(q, {"_id": 0, "news": 0})
     items = await cursor.to_list(length=2000)
     sleepers, busts, breakouts, elites = [], [], [], []
     for p in items:
