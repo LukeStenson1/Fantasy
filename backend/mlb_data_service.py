@@ -135,32 +135,32 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
     latest = seasons_sorted[-1]
     fppg = latest.get("fpts_per_game", 0)
     games = latest.get("G", 0)
-
     is_pitcher = position in MLB_PITCHER_POSITIONS
 
     if is_pitcher:
-        elite_thresh, break_thresh = 18, 13
-        min_games = 20
+        if fppg >= 18 and games >= 20:
+            return "elite"
+        if len(seasons_sorted) >= 2:
+            prev = seasons_sorted[-2]
+            if fppg >= 13 and prev.get("fpts_per_game", 0) < 10 and games >= 12:
+                return "breakout"
+        if games > 0 and games < 8:
+            return "risk"
+        if fppg >= 10 and games <= 20:
+            return "sleeper"
+        return None
     else:
-        elite_thresh, break_thresh = 4.5, 3.0
-        min_games = 30
-
-    if fppg >= elite_thresh and games >= min_games:
-        return "elite"
-    if len(seasons_sorted) >= 2:
-        prev = seasons_sorted[-2]
-        if (
-            fppg >= break_thresh
-            and prev.get("fpts_per_game", 0) < break_thresh - 3
-            and games >= min_games * 0.6
-        ):
-            return "breakout"
-    if games > 0 and games < min_games * 0.4:
-        return "risk"
-    if fppg >= break_thresh - 2 and games <= min_games and len(seasons_sorted) <= 2:
-        return "sleeper"
-    return None
-
+        if fppg >= 4.5 and games >= 30:
+            return "elite"
+        if len(seasons_sorted) >= 2:
+            prev = seasons_sorted[-2]
+            if fppg >= 3.0 and prev.get("fpts_per_game", 0) < fppg * 0.7 and games >= 18:
+                return "breakout"
+        if games > 0 and games < 12:
+            return "risk"
+        if fppg >= 2.5 and games <= 30:
+            return "sleeper"
+        return None
 
 def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
     """Fetch MLB player stats using MLB Stats API directly."""
