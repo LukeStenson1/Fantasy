@@ -343,7 +343,7 @@ async def sleepers_busts(
             continue
         if sport_val == "mlb" and int(str(player_season)) < current_year - 1:
             continue
-        if sport_val == "nba" and str(player_season) < f"{current_year - 2}-":
+        if sport_val == "nba" and str(player_season) != f"{current_year - 1}-{str(current_year)[-2:]}":
             continue
         slim = {
             "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
