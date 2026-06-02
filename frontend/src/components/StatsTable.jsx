@@ -157,7 +157,9 @@ export default function StatsTable({ rows, scoring, sport = "nfl", config }) {
 
   const SortIcon = ({ k }) => {
     if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 inline opacity-30" />;
-    return dir === "asc" ? <ArrowUp className="w-3 h-3 inline text-emerald-400" /> : <ArrowDown className="w-3 h-3 inline text-emerald-400" />;
+    return dir === "asc"
+      ? <ArrowUp className="w-3 h-3 inline" style={{ color: config?.hex || "#10b981" }} />
+      : <ArrowDown className="w-3 h-3 inline" style={{ color: config?.hex || "#10b981" }} />;
   };
 
   return (
