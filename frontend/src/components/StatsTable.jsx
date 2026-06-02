@@ -242,7 +242,7 @@ function PlayerRow({ player, expanded, onToggle, scoring, columns, sport }) {
       </tr>
       {expanded && (
         <tr className="expand-row" data-testid={`expand-row-${p.id}`}>
-          <td colSpan={columns.length + 1} className="bg-slate-900/40 border-t border-emerald-500/20 p-0">
+          <td colSpan={columns.length + 1} className="bg-slate-900/40 p-0" style={{ borderTop: `1px solid ${config?.hex || "#10b981"}33` }}>
             <ExpandedContent player={p} scoring={scoring} sport={sport} />
           </td>
         </tr>
