@@ -36,10 +36,10 @@ const SPORT_LABELS = {
 };
 
 export default function Stats() {
-  const { sport } = useSport();
+  const { sport, config } = useSport();
   const [position, setPosition] = useState("ALL");
   const [team, setTeam] = useState("ALL");
-  const [season, setSeason] = useState(String(new Date().getFullYear() - 1));
+  const [season, setSeason] = useState(String(currentYear - 1));
   const [scoring, setScoring] = useState("half_ppr");
   const [search, setSearch] = useState("");
   const [teams, setTeams] = useState([]);
@@ -51,7 +51,7 @@ export default function Stats() {
     setTeam("ALL");
     setSearch("");
     if (sport === "nba") setSeason("2025-26");
-    else if (sport === "mlb") setSeason(String(currentYear - 1));
+    else if (sport === "mlb") setSeason(String(currentYear));
     else setSeason(String(currentYear - 1));
   }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -94,7 +94,7 @@ export default function Stats() {
   }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
-    setPosition("ALL");
+    setPosition(sport === "mlb" ? "HITTERS" : "ALL");
     setTeam("ALL");
     setSearch("");
     if (sport === "nba") setSeason("2025-26");
@@ -107,8 +107,15 @@ export default function Stats() {
       <Navbar />
       <div className="border-b border-slate-800 bg-slate-950/60">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-2">◆ The Lab · Player Database</div>
-          <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white">Player Stats</h1>
+          <div
+            className="text-[10px] font-bold tracking-[0.25em] uppercase mb-2"
+            style={{ color: config.hex }}
+          >
+            ◆ The Lab · Player Database
+          </div>
+          <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white">
+            Player Stats
+          </h1>
           <p className="text-slate-400 mt-2">{SPORT_LABELS[sport]} (live API)</p>
         </div>
       </div>
@@ -123,14 +130,18 @@ export default function Stats() {
               className="bg-slate-900 text-white border-slate-700"
             />
           </div>
-          <Filter label="Position" value={position} set={setPosition} opts={positions} />
-          <Filter label="Team" value={team} set={setTeam} opts={["ALL", ...teams]} />
-          <Filter label="Season" value={season} set={setSeason} opts={seasons} />
+          <Filter label="Position" value={position} set={setPosition} opts={positions} config={config} />
+          <Filter label="Team" value={team} set={setTeam} opts={["ALL", ...teams]} config={config} />
+          <Filter label="Season" value={season} set={setSeason} opts={seasons} config={config} />
           {sport === "nfl" && (
             <Filter label="Scoring" value={scoring} set={setScoring}
-              opts={SCORINGS.map(s => s.v)} labels={SCORINGS.map(s => s.l)} />
+              opts={SCORINGS.map(s => s.v)} labels={SCORINGS.map(s => s.l)} config={config} />
           )}
-          <Button onClick={reset} variant="outline">
+          <Button
+            onClick={reset}
+            variant="outline"
+            className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
+          >
             <X className="w-4 h-4 mr-1" /> Reset
           </Button>
         </div>
@@ -139,13 +150,13 @@ export default function Stats() {
           {loading ? "Loading..." : `${rows.length} players`}
         </div>
 
-        <StatsTable rows={rows} scoring={scoring} sport={sport} />
+        <StatsTable rows={rows} scoring={scoring} sport={sport} config={config} />
       </div>
     </div>
   );
 }
 
-function Filter({ label, value, set, opts, labels }) {
+function Filter({ label, value, set, opts, labels, config }) {
   return (
     <div>
       <div className="text-xs text-slate-400 mb-1">{label}</div>
