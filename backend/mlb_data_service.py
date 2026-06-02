@@ -138,26 +138,38 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
     is_pitcher = position in MLB_PITCHER_POSITIONS
 
     if is_pitcher:
-        if fppg >= 18 and games >= 20:
+        era = latest.get("ERA", 9.99)
+        whip = latest.get("WHIP", 2.0)
+        # Elite: great stats, enough starts
+        if fppg >= 20 and games >= 10:
             return "elite"
+        # Breakout: huge jump from previous season
         if len(seasons_sorted) >= 2:
             prev = seasons_sorted[-2]
-            if fppg >= 13 and prev.get("fpts_per_game", 0) < 10 and games >= 12:
+            if fppg >= 15 and prev.get("fpts_per_game", 0) < fppg * 0.75 and games >= 5:
                 return "breakout"
-        if games > 0 and games < 8:
+        # Risk: genuinely bad ERA/WHIP, not just low game count
+        if games >= 5 and era >= 5.5 and whip >= 1.5:
             return "risk"
-        if fppg >= 10 and games <= 20:
+        # Sleeper: good stats but limited track record
+        if fppg >= 15 and games <= 12 and len(seasons_sorted) <= 2:
             return "sleeper"
         return None
     else:
+        # Elite: top performers
         if fppg >= 3.8 and games >= 35:
             return "elite"
+        # Breakout: significant improvement over last season
         if len(seasons_sorted) >= 2:
             prev = seasons_sorted[-2]
             if fppg >= 3.0 and prev.get("fpts_per_game", 0) < fppg * 0.7 and games >= 18:
                 return "breakout"
-        if games > 0 and games < 12:
+        # Risk: genuinely bad AVG and low production, not just few games
+        avg = latest.get("AVG", 0.300)
+        ops = latest.get("OPS", 0.700)
+        if games >= 20 and avg < 0.180 and ops < 0.550:
             return "risk"
+        # Sleeper: decent production, limited games
         if fppg >= 2.5 and games <= 30:
             return "sleeper"
         return None
