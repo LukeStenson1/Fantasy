@@ -150,7 +150,7 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
             return "sleeper"
         return None
     else:
-        if fppg >= 4.5 and games >= 30:
+        if fppg >= 3.8 and games >= 35:
             return "elite"
         if len(seasons_sorted) >= 2:
             prev = seasons_sorted[-2]
