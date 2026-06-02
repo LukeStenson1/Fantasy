@@ -125,7 +125,7 @@ function getValue(p, col) {
   return p[col.key];
 }
 
-export default function StatsTable({ rows, scoring, sport = "nfl" }) {
+export default function StatsTable({ rows, scoring, sport = "nfl", config }) {
   const [sortKey, setSortKey] = useState("current_fpts");
   const [dir, setDir] = useState("desc");
   const [expandedId, setExpandedId] = useState(null);
