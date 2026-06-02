@@ -170,7 +170,8 @@ export default function StatsTable({ rows, scoring, sport = "nfl", config }) {
             <th style={{width: 28}}></th>
             {columns.map((c) => (
               <th key={c.key} onClick={() => c.sortable && onSort(c.key)}
-                className={`text-left whitespace-nowrap ${c.emphasize ? "text-emerald-300" : ""}`}
+                className={`text-left whitespace-nowrap`}
+                style={c.emphasize ? { color: config?.hexLight || "#34d399" } : {}}
                 data-testid={`col-header-${c.key}`}>
                 {c.label} {c.sortable && <SortIcon k={c.key} />}
               </th>
