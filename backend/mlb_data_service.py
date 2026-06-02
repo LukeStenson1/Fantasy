@@ -142,8 +142,8 @@ def _detect_mlb_tag(seasons: list[dict], position: str) -> str | None:
         elite_thresh, break_thresh = 18, 13
         min_games = 20
     else:
-        elite_thresh, break_thresh = 8, 5
-        min_games = 40
+        elite_thresh, break_thresh = 4.5, 3.0
+        min_games = 30
 
     if fppg >= elite_thresh and games >= min_games:
         return "elite"
