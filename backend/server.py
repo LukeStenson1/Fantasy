@@ -335,6 +335,16 @@ async def sleepers_busts(
         p = _attach_current_season(p, None, scoring)
         if not p.get("current_season"):
             continue
+        # Skip players whose latest season is too old
+        current_year = datetime.now(timezone.utc).year
+        player_season = p["current_season"].get("season", 0)
+        sport_val = p.get("sport", "nfl")
+        if sport_val == "nfl" and int(str(player_season)) < current_year - 1:
+            continue
+        if sport_val == "mlb" and int(str(player_season)) < current_year - 1:
+            continue
+        if sport_val == "nba" and str(player_season) < f"{current_year - 2}-":
+            continue
         slim = {
             "id": p["id"], "name": p["name"], "position": p["position"], "team": p["team"],
             "tag": p.get("tag"),
