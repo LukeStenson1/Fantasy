@@ -233,7 +233,8 @@ function PlayerRow({ player, expanded, onToggle, scoring, columns, sport }) {
               typeof v === "number" ? v.toLocaleString() : v;
           }
           return (
-            <td key={c.key} className={`font-mono-tab ${c.emphasize ? "font-bold text-emerald-300" : "text-slate-300"}`}>
+            <td key={c.key} className={`font-mono-tab ${c.emphasize ? "font-bold" : "text-slate-300"}`}
+              style={c.emphasize ? { color: config?.hexLight || "#34d399" } : {}}
               {formatted}
             </td>
           );
