@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { PositionBadge, TagBadge, InjuryBadge, MatchupBadge } from "../components/Badges";
 import { Plus, X, Trophy, Sparkles, Save, ExternalLink, Wand2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useSport } from "../contexts/SportContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import AdSlot from "../components/AdSlot";
@@ -19,8 +20,33 @@ const SCORINGS = [
 
 const SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF"];
 
+const SPORT_CONTENT = {
+  nfl: {
+    title: "Build Your Lineup",
+    subtitle: "Add every player on your roster. The Lab auto-picks 1 QB / 2 RB / 2 WR / 1 TE / 1 FLEX / 1 K / 1 DEF with Lab Score and per-player reasoning.",
+    breadcrumb: "Lineup AI + Start/Sit",
+    searchPlaceholder: "Search any player (incl. rookies, K, DEF)…",
+    searchTip: 'Tip: search "D/ST" or a team name (e.g. "Bills") for defenses.',
+  },
+  nba: {
+    title: "Build Your NBA Lineup",
+    subtitle: "Add players from your roster. The Lab scores each player using FPts/G, matchup data, and trends to help you pick your starters.",
+    breadcrumb: "NBA Lineup Builder",
+    searchPlaceholder: "Search any NBA player…",
+    searchTip: "Tip: search by position (e.g. \"PG\") or team name.",
+  },
+  mlb: {
+    title: "Build Your MLB Lineup",
+    subtitle: "Add hitters and pitchers from your roster. The Lab scores each player using FPts/G and matchup data.",
+    breadcrumb: "MLB Lineup Builder",
+    searchPlaceholder: "Search any MLB player or pitcher…",
+    searchTip: "Tip: search by position (e.g. \"SP\") or team name.",
+  },
+};
+
 export default function Lineup() {
   const { user } = useAuth();
+  const { sport, config } = useSport();
   const navigate = useNavigate();
   const [scoring, setScoring] = useState("half_ppr");
   const [search, setSearch] = useState("");
@@ -31,14 +57,24 @@ export default function Lineup() {
   const [savedTitle, setSavedTitle] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const content = SPORT_CONTENT[sport] || SPORT_CONTENT.nfl;
+
+  // Clear roster when sport changes
+  useEffect(() => {
+    setRoster([]);
+    setBuilt(null);
+    setSearch("");
+    setResults([]);
+  }, [sport]);
+
   useEffect(() => {
     if (!search) { setResults([]); return; }
     const t = setTimeout(() => {
-      api.get("/players", { params: { search, scoring, limit: 25 } })
+      api.get("/players", { params: { search, scoring, sport, limit: 25 } })
         .then((r) => setResults(r.data.items || []));
     }, 200);
     return () => clearTimeout(t);
-  }, [search, scoring]);
+  }, [search, scoring, sport]);
 
   const addPlayer = (p) => {
     if (roster.find((x) => x.id === p.id)) return;
@@ -95,19 +131,30 @@ export default function Lineup() {
       <div className="border-b border-slate-800 bg-slate-950/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-end justify-between flex-wrap gap-4">
           <div>
-            <div className="text-[10px] font-bold tracking-[0.25em] uppercase text-emerald-400 mb-2">◆ The Lab · Lineup AI + Start/Sit</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white" data-testid="lineup-title">Build Your Lineup</h1>
-            <p className="text-slate-400 mt-2 max-w-2xl">Add every player on your roster. The Lab auto-picks 1 QB / 2 RB / 2 WR / 1 TE / 1 FLEX / 1 K / 1 DEF with Lab Score and per-player reasoning.</p>
+            <div
+              className="text-[10px] font-bold tracking-[0.25em] uppercase mb-2"
+              style={{ color: config.hex }}
+            >
+              ◆ The Lab · {content.breadcrumb}
+            </div>
+            <h1 className="font-display text-4xl sm:text-5xl font-black tracking-tight text-white" data-testid="lineup-title">
+              {content.title}
+            </h1>
+            <p className="text-slate-400 mt-2 max-w-2xl">{content.subtitle}</p>
           </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">Scoring</label>
-            <Select value={scoring} onValueChange={setScoring}>
-              <SelectTrigger className="w-[160px] bg-slate-900 border-slate-700 text-white" data-testid="lineup-scoring"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                {SCORINGS.map((s) => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {sport === "nfl" && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">Scoring</label>
+              <Select value={scoring} onValueChange={setScoring}>
+                <SelectTrigger className="w-[160px] bg-slate-900 border-slate-700 text-white" data-testid="lineup-scoring">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-white">
+                  {SCORINGS.map((s) => <SelectItem key={s.v} value={s.v}>{s.l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -116,12 +163,14 @@ export default function Lineup() {
         <div className="bg-slate-950/60 border border-slate-800 rounded-md p-5" data-testid="roster-builder">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">Add player to roster</label>
+              <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">
+                Add player to roster
+              </label>
               <div className="relative">
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search any player (incl. rookies, K, DEF)…"
+                  placeholder={content.searchPlaceholder}
                   className="bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
                   data-testid="roster-search-input"
                 />
@@ -142,10 +191,12 @@ export default function Lineup() {
                   </div>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-2">Tip: search "D/ST" or a team name (e.g. "Bills") for defenses.</p>
+              <p className="text-xs text-slate-500 mt-2">{content.searchTip}</p>
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">Your roster ({roster.length})</label>
+              <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 block mb-1.5">
+                Your roster ({roster.length})
+              </label>
               {roster.length === 0 ? (
                 <div className="border border-dashed border-slate-700 rounded-md p-6 text-center text-sm text-slate-500" data-testid="roster-empty">
                   Add at least 2 players to start.
@@ -159,7 +210,8 @@ export default function Lineup() {
                         <span className="font-semibold text-white truncate">{p.name}</span>
                         <span className="text-xs text-slate-500 font-mono-tab">{p.team}</span>
                       </div>
-                      <button onClick={() => removePlayer(p.id)} className="text-slate-500 hover:text-red-400 shrink-0" data-testid={`roster-remove-${p.id}`}>
+                      <button onClick={() => removePlayer(p.id)} className="text-slate-500 hover:text-red-400 shrink-0"
+                        data-testid={`roster-remove-${p.id}`}>
                         <X className="w-4 h-4" />
                       </button>
                     </li>
@@ -169,12 +221,20 @@ export default function Lineup() {
             </div>
           </div>
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Button onClick={build} disabled={roster.length < 2 || building} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold" data-testid="build-lineup-btn">
+            <Button
+              onClick={build}
+              disabled={roster.length < 2 || building}
+              className="font-bold text-slate-950"
+              style={{ background: config.hex }}
+              data-testid="build-lineup-btn"
+            >
               <Wand2 className="w-4 h-4 mr-1" />
               {building ? "Building…" : "Auto-Pick Starters"}
             </Button>
             {roster.length > 0 && (
-              <button onClick={() => { setRoster([]); setBuilt(null); }} className="text-xs text-slate-500 hover:text-white uppercase tracking-wider" data-testid="clear-roster-btn">
+              <button onClick={() => { setRoster([]); setBuilt(null); }}
+                className="text-xs text-slate-500 hover:text-white uppercase tracking-wider"
+                data-testid="clear-roster-btn">
                 Clear roster
               </button>
             )}
@@ -189,7 +249,12 @@ export default function Lineup() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {SLOT_ORDER.flatMap((slot) =>
                 (built.starters[slot] || []).map((p, i) => (
-                  <SlotCard key={`${slot}-${i}`} slotLabel={slot === "RB" || slot === "WR" ? `${slot}${i + 1}` : slot} player={p} />
+                  <SlotCard
+                    key={`${slot}-${i}`}
+                    slotLabel={slot === "RB" || slot === "WR" ? `${slot}${i + 1}` : slot}
+                    player={p}
+                    config={config}
+                  />
                 ))
               )}
             </div>
@@ -198,11 +263,14 @@ export default function Lineup() {
               <div className="bg-slate-950/60 border border-slate-800 rounded-md overflow-hidden" data-testid="bench-list">
                 <div className="px-5 py-3 border-b border-slate-800 flex items-center gap-2">
                   <h3 className="font-display font-bold text-lg text-white">Bench</h3>
-                  <span className="ml-auto text-xs text-slate-500 font-mono-tab">{built.bench.length} players · ranked by Lab Score</span>
+                  <span className="ml-auto text-xs text-slate-500 font-mono-tab">
+                    {built.bench.length} players · ranked by Lab Score
+                  </span>
                 </div>
                 <ul className="divide-y divide-slate-800">
                   {built.bench.map((p, i) => (
-                    <li key={p.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-slate-900" data-testid={`bench-${i}`}>
+                    <li key={p.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-slate-900"
+                      data-testid={`bench-${i}`}>
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-slate-600 font-mono-tab text-xs w-5">{i + 1}</span>
                         <PositionBadge position={p.position} />
@@ -226,11 +294,15 @@ export default function Lineup() {
                       <div className="flex items-center gap-3 shrink-0">
                         {p.news_search_url && (
                           <a href={p.news_search_url} target="_blank" rel="noopener noreferrer"
-                            className="text-emerald-400 hover:text-emerald-300" data-testid={`bench-news-${i}`}>
+                            className="hover:opacity-80" style={{ color: config.hex }}
+                            data-testid={`bench-news-${i}`}>
                             <ExternalLink className="w-4 h-4" />
                           </a>
                         )}
-                        <span className="font-mono-tab text-base font-bold text-emerald-300">{p.lineup_score?.toFixed?.(1)}</span>
+                        <span className="font-mono-tab text-base font-bold"
+                          style={{ color: config.hexLight }}>
+                          {p.lineup_score?.toFixed?.(1)}
+                        </span>
                       </div>
                     </li>
                   ))}
@@ -239,23 +311,32 @@ export default function Lineup() {
             )}
 
             {/* Save bar */}
-            <div className="bg-slate-950/40 border border-slate-800 rounded-md p-4 flex flex-wrap items-center gap-3" data-testid="lineup-save-bar">
+            <div className="bg-slate-950/40 border border-slate-800 rounded-md p-4 flex flex-wrap items-center gap-3"
+              data-testid="lineup-save-bar">
               <div className="flex items-center gap-2 text-sm text-slate-300">
-                <Save className="w-4 h-4 text-emerald-400" />
-                {user && user !== false ? "Save this lineup so the Lab can score predictions and learn over time." : "Sign in to save lineups."}
+                <Save className="w-4 h-4" style={{ color: config.hex }} />
+                {user && user !== false
+                  ? "Save this lineup so the Lab can score predictions and learn over time."
+                  : "Sign in to save lineups."}
               </div>
-              <Input value={savedTitle} onChange={(e) => setSavedTitle(e.target.value)} placeholder="Lineup title (e.g. Week 1)"
-                className="md:max-w-xs bg-slate-900 border-slate-700 text-white" data-testid="save-lineup-title" />
-              <Button onClick={handleSave} disabled={saving} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold" data-testid="save-lineup-btn">
+              <Input value={savedTitle} onChange={(e) => setSavedTitle(e.target.value)}
+                placeholder="Lineup title (e.g. Week 1)"
+                className="md:max-w-xs bg-slate-900 border-slate-700 text-white"
+                data-testid="save-lineup-title" />
+              <Button onClick={handleSave} disabled={saving}
+                className="font-bold text-slate-950"
+                style={{ background: config.hex }}
+                data-testid="save-lineup-btn">
                 {saving ? "Saving…" : (user && user !== false ? "Save Lineup" : "Login to Save")}
               </Button>
             </div>
 
-            <div className="bg-slate-950/40 border border-emerald-500/20 rounded-md p-4 flex items-start gap-3">
-              <Sparkles className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+            <div className="bg-slate-950/40 border rounded-md p-4 flex items-start gap-3"
+              style={{ borderColor: `${config.hex}33` }}>
+              <Sparkles className="w-4 h-4 mt-0.5 shrink-0" style={{ color: config.hex }} />
               <div className="text-xs text-slate-400">
-                <strong className="text-emerald-300">Lab Score</strong> = FPts/G + matchup adj (live opposing D rank) + availability + trend boost + self-learned correction. Higher = better start.
-                K and D/ST scored using opposing-team profile.
+                <strong style={{ color: config.hexLight }}>Lab Score</strong> = FPts/G + matchup adj (live opposing D rank) + availability + trend boost + self-learned correction. Higher = better start.
+                {sport === "nfl" && " K and D/ST scored using opposing-team profile."}
               </div>
             </div>
           </div>
@@ -265,14 +346,21 @@ export default function Lineup() {
   );
 }
 
-function SlotCard({ slotLabel, player }) {
+function SlotCard({ slotLabel, player, config }) {
   const p = player;
   const f = p.factors || {};
   return (
-    <div className="bg-slate-950/60 border border-slate-800 hover:border-emerald-500/50 rounded-md p-4 transition-colors" data-testid={`slot-${slotLabel}`}>
+    <div className="bg-slate-950/60 border border-slate-800 rounded-md p-4 transition-colors"
+      style={{ '--hover-border': `${config.hex}80` }}
+      onMouseEnter={(e) => e.currentTarget.style.borderColor = `${config.hex}80`}
+      onMouseLeave={(e) => e.currentTarget.style.borderColor = ''}
+      data-testid={`slot-${slotLabel}`}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-emerald-400">{slotLabel}</span>
-        <Trophy className="w-3.5 h-3.5 text-emerald-400/40" />
+        <span className="text-[10px] font-bold tracking-[0.2em] uppercase"
+          style={{ color: config.hex }}>
+          {slotLabel}
+        </span>
+        <Trophy className="w-3.5 h-3.5" style={{ color: `${config.hex}66` }} />
       </div>
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <PositionBadge position={p.position} />
@@ -287,16 +375,22 @@ function SlotCard({ slotLabel, player }) {
         />
       </div>
       <div className="font-display font-bold text-lg text-white leading-tight">{p.name}</div>
-      <div className="text-xs font-mono-tab text-slate-400">{p.team}{f.opponent ? ` · vs ${f.opponent}` : ""}</div>
+      <div className="text-xs font-mono-tab text-slate-400">
+        {p.team}{f.opponent ? ` · vs ${f.opponent}` : ""}
+      </div>
       <div className="mt-3 pt-3 border-t border-slate-800">
         <div className="flex items-baseline justify-between">
           <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">Lab Score</div>
-          <div className="font-mono-tab text-2xl font-bold text-emerald-300">{p.lineup_score?.toFixed?.(1)}</div>
+          <div className="font-mono-tab text-2xl font-bold"
+            style={{ color: config.hexLight }}>
+            {p.lineup_score?.toFixed?.(1)}
+          </div>
         </div>
         <div className="text-xs text-slate-400 mt-2 leading-snug">{p.reasoning}</div>
         {p.news_search_url && (
           <a href={p.news_search_url} target="_blank" rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+            className="mt-2 inline-flex items-center gap-1 text-xs hover:opacity-80"
+            style={{ color: config.hex }}>
             Latest news <ExternalLink className="w-3 h-3" />
           </a>
         )}
