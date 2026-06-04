@@ -271,7 +271,7 @@ function RookieCard({ rookie, expanded, onToggle, outlook, config }) {
             <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase border rounded ${labelColor}`}>
               {labelText}
             </span>
-            <TagBadge tag={r.tag} />
+            <TagBadge tag={r.tag} config={config} />
           </div>
           <div className="font-display text-lg font-bold text-white leading-tight">{r.name}</div>
           <div className="text-xs text-slate-400 mt-0.5 font-mono-tab">
