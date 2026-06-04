@@ -159,7 +159,7 @@ export default function DraftBoard() {
                       <span className="text-xs font-mono-tab text-slate-500">{p.team}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <TagBadge tag={p.tag} />
+                      <TagBadge tag={p.tag} config={config} />
                       <span className="font-mono-tab text-sm font-bold"
                         style={{ color: config.hexLight }}>
                         {p.current_fpts_per_game?.toFixed?.(1) ?? "—"}/g
