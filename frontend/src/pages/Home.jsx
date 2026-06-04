@@ -260,11 +260,7 @@ function MoverList({ title, icon, players = [], tag, loading, scoring, config })
                 </div>
                 <div className="text-xs text-slate-500">{p.team}{season ? ` · ${season}` : ""}</div>
               </div>
-              {tag && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${TAG_STYLES[tag]}`}>
-                  {TAG_LABELS[tag]}
-                </span>
-              )}
+              {tag && <TagBadge tag={tag} config={config} />}
               {fppg != null && (
                 <div className="text-right shrink-0">
                   <div className="text-sm text-white font-mono font-semibold">{Number(fppg).toFixed(1)}</div>
