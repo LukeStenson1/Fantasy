@@ -1,9 +1,4 @@
-"""ESPN injuries + news integration — pulls real-time NFL data from public ESPN endpoints.
-
-Injuries endpoint: https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries
-News endpoint: https://site.api.espn.com/apis/site/v2/sports/football/nfl/news
-- Both public, no API key, no auth.
-"""
+"""ESPN injuries + news integration — pulls real-time NFL, NBA, and MLB data from public ESPN endpoints."""
 from __future__ import annotations
 import asyncio
 import logging
@@ -14,22 +9,19 @@ import re
 
 logger = logging.getLogger("ffref.injuries")
 
+# ── ESPN endpoints ────────────────────────────────────────────────────────────
 ESPN_INJURIES_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries"
-ESPN_NEWS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=100"
-ESPN_TEAM_NEWS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/{team_id}/news?limit=20"
+
+ESPN_NEWS_URLS = {
+    "nfl": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=100",
+    "nba": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=100",
+    "mlb": "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/news?limit=100",
+}
 
 STATUS_PENALTY = {
-    "active": 0.0,
-    "probable": -0.2,
-    "questionable": -1.0,
-    "doubtful": -3.5,
-    "out": -10.0,
-    "ir": -10.0,
-    "injured reserve": -10.0,
-    "pup": -10.0,
-    "suspension": -10.0,
-    "suspended": -10.0,
-    "day-to-day": -0.5,
+    "active": 0.0, "probable": -0.2, "questionable": -1.0, "doubtful": -3.5,
+    "out": -10.0, "ir": -10.0, "injured reserve": -10.0, "pup": -10.0,
+    "suspension": -10.0, "suspended": -10.0, "day-to-day": -0.5,
 }
 
 def _normalize(name: str) -> str:
@@ -54,7 +46,6 @@ ESPN_TO_CODE = {
     "Tennessee Titans": "TEN", "Washington Commanders": "WAS",
 }
 
-# ESPN team abbreviation -> our code
 ESPN_ABV_TO_CODE = {
     "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BUF": "BUF", "CAR": "CAR",
     "CHI": "CHI", "CIN": "CIN", "CLE": "CLE", "DAL": "DAL", "DEN": "DEN",
@@ -63,7 +54,40 @@ ESPN_ABV_TO_CODE = {
     "MIN": "MIN", "NE": "NE", "NO": "NO", "NYG": "NYG", "NYJ": "NYJ",
     "PHI": "PHI", "PIT": "PIT", "SEA": "SEA", "SF": "SF", "TB": "TB",
     "TEN": "TEN", "WSH": "WAS", "WAS": "WAS",
+    # NBA
+    "ATL": "ATL", "BOS": "BOS", "BKN": "BKN", "CHA": "CHA", "CHI": "CHI",
+    "CLE": "CLE", "DAL": "DAL", "DEN": "DEN", "DET": "DET", "GSW": "GSW",
+    "HOU": "HOU", "IND": "IND", "LAC": "LAC", "LAL": "LAL", "MEM": "MEM",
+    "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NOP": "NOP", "NYK": "NYK",
+    "OKC": "OKC", "ORL": "ORL", "PHI": "PHI", "PHX": "PHX", "POR": "POR",
+    "SAC": "SAC", "SAS": "SAS", "TOR": "TOR", "UTA": "UTA", "WAS": "WAS",
+    # MLB
+    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC",
+    "CWS": "CWS", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET",
+    "HOU": "HOU", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA",
+    "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK",
+    "PHI": "PHI", "PIT": "PIT", "SD": "SD", "SF": "SF", "SEA": "SEA",
+    "STL": "STL", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSH": "WSH",
 }
+
+# Sport-specific position filters for news matching
+SPORT_POSITIONS = {
+    "nfl": ["QB", "RB", "WR", "TE", "K", "DEF"],
+    "nba": ["PG", "SG", "SF", "PF", "C"],
+    "mlb": ["SP", "RP", "C", "1B", "2B", "3B", "SS", "OF", "DH"],
+}
+
+FANTASY_KEYWORDS = [
+    "fantasy", "targets", "touches", "snap", "snaps", "carries", "role",
+    "depth chart", "starter", "backup", "injury", "return", "practice",
+    "week", "activate", "waiver", "start", "sit", "add", "drop", "trade",
+    "points", "production", "workload", "usage", "contract", "signs", "cut",
+    # NBA
+    "minutes", "rebounds", "assists", "blocks", "steals", "rotation",
+    # MLB
+    "batting", "pitching", "rotation", "bullpen", "lineup", "ERA", "strikeout",
+    "home run", "batting average", "on base",
+]
 
 
 def _fetch_url_sync(url: str) -> dict | list:
@@ -75,162 +99,190 @@ def _fetch_url_sync(url: str) -> dict | list:
 def _fetch_injuries_sync() -> list[dict]:
     return _fetch_url_sync(ESPN_INJURIES_URL)
 
-def _fetch_news_sync() -> list[dict]:
-    """Fetch latest NFL news from ESPN. Returns list of article dicts."""
+
+def _extract_team_codes(article: dict) -> list[str]:
+    """Extract team codes from ESPN article categories."""
+    teams = []
+    for cat in (article.get("categories") or []):
+        if cat.get("type") == "team":
+            abv = cat.get("abbreviation", "")
+            code = ESPN_ABV_TO_CODE.get(abv.upper())
+            if not code:
+                desc = cat.get("description", "")
+                code = ESPN_TO_CODE.get(desc)
+            if not code:
+                team_obj = cat.get("team", {})
+                if isinstance(team_obj, dict):
+                    desc = team_obj.get("description", "")
+                    code = ESPN_TO_CODE.get(desc)
+            if code:
+                teams.append(code)
+    return teams
+
+
+def _extract_athlete_names(article: dict) -> list[str]:
+    """Extract player names mentioned in article categories."""
+    names = []
+    for cat in (article.get("categories") or []):
+        if cat.get("type") == "athlete":
+            desc = cat.get("description", "")
+            if desc:
+                names.append(desc)
+            ath = cat.get("athlete", {})
+            if isinstance(ath, dict):
+                ath_desc = ath.get("description", "")
+                if ath_desc and ath_desc not in names:
+                    names.append(ath_desc)
+    return names
+
+
+def _parse_articles(articles: list[dict], sport: str) -> list[dict]:
+    """Parse ESPN articles into standardized news items."""
+    news_items = []
+    for a in articles:
+        if not isinstance(a, dict):
+            continue
+        teams = _extract_team_codes(a)
+        athletes = _extract_athlete_names(a)
+        headline = a.get("headline") or a.get("title") or ""
+        description = a.get("description") or ""
+        published = a.get("published") or a.get("lastModified") or ""
+        url = ""
+        links = a.get("links") or {}
+        if isinstance(links, dict):
+            web = links.get("web")
+            if isinstance(web, dict):
+                url = web.get("href", "")
+            elif isinstance(web, list) and web:
+                url = web[0].get("href", "") if isinstance(web[0], dict) else ""
+        news_items.append({
+            "headline": headline,
+            "snippet": description[:300] if description else "",
+            "url": url,
+            "date": published[:10] if published else "",
+            "source": "ESPN",
+            "teams": teams,
+            "athletes": athletes,
+            "sport": sport,
+        })
+    return news_items
+
+
+def _fetch_news_sync(sport: str = "nfl") -> list[dict]:
+    """Fetch latest news for a sport from ESPN."""
+    url = ESPN_NEWS_URLS.get(sport, ESPN_NEWS_URLS["nfl"])
     try:
-        payload = _fetch_url_sync(ESPN_NEWS_URL)
+        payload = _fetch_url_sync(url)
         if not isinstance(payload, dict):
-            logger.warning(f"ESPN news unexpected response type: {type(payload)}")
             return []
-        articles = payload.get("articles", []) or []
-        articles = [a for a in articles if isinstance(a, dict)]
+        articles = [a for a in (payload.get("articles") or []) if isinstance(a, dict)]
         if articles:
-            first = articles[0]
-            logger.info(f"ESPN article sample keys: {list(first.keys())}")
-            logger.info(f"ESPN article categories sample: {first.get('categories', [])[:3]}")
-        news_items = []
-        for a in articles:
-            teams = []
-            for cat in (a.get("categories") or []):
-                if cat.get("type") == "team":
-                    abv = cat.get("abbreviation", "")
-                    code = ESPN_ABV_TO_CODE.get(abv.upper())
-                    if not code:
-                        desc = cat.get("description", "")
-                        code = ESPN_TO_CODE.get(desc)
-                    if not code:
-                        team_obj = cat.get("team", {})
-                        if isinstance(team_obj, dict):
-                            desc = team_obj.get("description", "")
-                            code = ESPN_TO_CODE.get(desc)
-                    if code:
-                        teams.append(code)
-            headline = a.get("headline") or a.get("title") or ""
-            description = a.get("description") or ""
-            published = a.get("published") or a.get("lastModified") or ""
-            url = ""
-            links = a.get("links") or {}
-            if isinstance(links, dict):
-                web = links.get("web")
-                if isinstance(web, dict):
-                    url = web.get("href", "")
-                elif isinstance(web, list) and web:
-                    url = web[0].get("href", "") if isinstance(web[0], dict) else ""
-            news_items.append({
-                "headline": headline,
-                "snippet": description[:300] if description else "",
-                "url": url,
-                "date": published[:10] if published else "",
-                "source": "ESPN",
-                "teams": teams,
-            })
-        logger.info(f"ESPN news: fetched {len(news_items)} articles")
+            logger.info(f"ESPN article sample keys: {list(articles[0].keys())}")
+            logger.info(f"ESPN article categories sample: {articles[0].get('categories', [])[:3]}")
+        news_items = _parse_articles(articles, sport)
+        logger.info(f"ESPN {sport.upper()} news: fetched {len(news_items)} articles")
         return news_items
     except Exception as e:
-        logger.warning(f"ESPN news fetch failed: {e}")
+        logger.warning(f"ESPN {sport} news fetch failed: {e}")
         return []
 
-async def refresh_news(db, news_items: list[dict]) -> int:
-    """Match news articles to players by team and update their news field.
-    Each player gets up to 6 most recent articles from their team."""
-    if not news_items:
-        return 0
-
-    # Build team -> news list map
-    team_news: dict[str, list[dict]] = {}
-    for item in news_items:
-        for team in item.get("teams", []):
-            team_news.setdefault(team, []).append(item)
-
-    logger.info(f"News team_news keys: {list(team_news.keys())[:10]}")
-    logger.info(f"Sample news item teams: {[item.get('teams') for item in news_items[:5]]}")
-
-    # Keep only 6 per team, sorted by date desc
-    for team in team_news:
-        team_news[team] = sorted(
-            team_news[team],
-            key=lambda x: x.get("date", ""),
-            reverse=True
-        )[:6]
-
-    updated = 0
-    for team, articles in team_news.items():
-        result = await db.players.update_many(
-            {"team": team, "position": {"$in": ["QB", "RB", "WR", "TE", "K"]}},
-            {"$set": {"news": articles}}
-        )
-        updated += result.modified_count
-
-    logger.info(f"News refresh: updated {updated} players across {len(team_news)} teams")
-    return updated
-
-FANTASY_KEYWORDS = [
-    "fantasy", "targets", "touches", "snap", "snaps", "carries", "role",
-    "depth chart", "starter", "backup", "injury", "return", "practice",
-    "week", "activate", "waiver", "start", "sit", "add", "drop", "trade",
-    "points", "production", "workload", "usage", "contract", "signs", "cut",
-]
 
 def _fantasy_score(article: dict) -> int:
-    """Score article by fantasy relevance — higher = more relevant."""
     text = (article.get("headline", "") + " " + article.get("snippet", "")).lower()
     return sum(1 for kw in FANTASY_KEYWORDS if kw in text)
 
+
 async def refresh_news(db, news_items: list[dict]) -> int:
-    """Match news articles to players by team and update their news field.
-    Prioritizes fantasy-relevant articles. Invalidates cached outlooks when news changes."""
+    """Match news articles to players by team/athlete and update their news field.
+    Handles NFL, NBA, and MLB players."""
     if not news_items:
         return 0
 
-    # Build team -> news list map
-    team_news: dict[str, list[dict]] = {}
+    # Group by sport
+    by_sport: dict[str, list[dict]] = {}
     for item in news_items:
-        for team in item.get("teams", []):
-            team_news.setdefault(team, []).append(item)
-
-    # Sort by fantasy relevance first, then date — keep top 6
-    for team in team_news:
-        team_news[team] = sorted(
-            team_news[team],
-            key=lambda x: (_fantasy_score(x), x.get("date", "")),
-            reverse=True
-        )[:6]
+        s = item.get("sport", "nfl")
+        by_sport.setdefault(s, []).append(item)
 
     updated = 0
     invalidated_outlook_ids = []
 
-    for team, articles in team_news.items():
-        # Find players on this team
-        players = await db.players.find(
-            {"team": team, "position": {"$in": ["QB", "RB", "WR", "TE", "K"]}},
-            {"_id": 0, "id": 1, "news": 1}
-        ).to_list(length=50)
+    for sport, articles in by_sport.items():
+        positions = SPORT_POSITIONS.get(sport, SPORT_POSITIONS["nfl"])
 
-        for player in players:
-            old_news = player.get("news") or []
-            old_headlines = {n.get("headline") for n in old_news}
-            new_headlines = {a.get("headline") for a in articles}
+        # Build team -> news map
+        team_news: dict[str, list[dict]] = {}
+        for item in articles:
+            for team in item.get("teams", []):
+                team_news.setdefault(team, []).append(item)
 
-            # News changed — update player and invalidate cached outlook
-            if old_headlines != new_headlines:
-                await db.players.update_one(
-                    {"id": player["id"]},
-                    {"$set": {"news": articles}}
-                )
-                invalidated_outlook_ids.append(player["id"])
-                updated += 1
+        # Sort by fantasy relevance, keep top 6 per team
+        for team in team_news:
+            team_news[team] = sorted(
+                team_news[team],
+                key=lambda x: (_fantasy_score(x), x.get("date", "")),
+                reverse=True,
+            )[:6]
 
-    # Invalidate cached outlooks for players with new news
+        for team, team_articles in team_news.items():
+            players = await db.players.find(
+                {"team": team, "sport": sport if sport != "nfl" else {"$not": {"$in": ["nba", "mlb"]}},
+                 "position": {"$in": positions}},
+                {"_id": 0, "id": 1, "news": 1}
+            ).to_list(length=100)
+
+            for player in players:
+                old_headlines = {n.get("headline") for n in (player.get("news") or [])}
+                new_headlines = {a.get("headline") for a in team_articles}
+                if old_headlines != new_headlines:
+                    await db.players.update_one(
+                        {"id": player["id"]},
+                        {"$set": {"news": team_articles}}
+                    )
+                    invalidated_outlook_ids.append(player["id"])
+                    updated += 1
+
+        # Also match by athlete name for direct mentions
+        athlete_articles: dict[str, list[dict]] = {}
+        for item in articles:
+            for name in item.get("athletes", []):
+                athlete_articles.setdefault(name, []).append(item)
+
+        for athlete_name, ath_articles in athlete_articles.items():
+            player = await db.players.find_one(
+                {"name": {"$regex": f"^{re.escape(athlete_name)}$", "$options": "i"},
+                 "sport": sport if sport != "nfl" else {"$not": {"$in": ["nba", "mlb"]}}},
+                {"_id": 0, "id": 1, "news": 1}
+            )
+            if player:
+                # Merge with existing team news, deduplicate
+                existing = player.get("news") or []
+                existing_headlines = {n.get("headline") for n in existing}
+                new_items = [a for a in ath_articles if a.get("headline") not in existing_headlines]
+                if new_items:
+                    merged = sorted(
+                        existing + new_items,
+                        key=lambda x: (_fantasy_score(x), x.get("date", "")),
+                        reverse=True,
+                    )[:6]
+                    await db.players.update_one(
+                        {"id": player["id"]},
+                        {"$set": {"news": merged}}
+                    )
+                    if player["id"] not in invalidated_outlook_ids:
+                        invalidated_outlook_ids.append(player["id"])
+                    updated += 1
+
     if invalidated_outlook_ids:
         res = await db.outlooks.delete_many({"player_id": {"$in": invalidated_outlook_ids}})
         logger.info(f"News refresh: invalidated {res.deleted_count} cached outlooks due to new news")
 
-    logger.info(f"News refresh: updated {updated} players across {len(team_news)} teams")
+    logger.info(f"News refresh: updated {updated} players across {len(by_sport)} sports")
     return updated
 
 
 async def refresh_injuries(db) -> dict:
-    """Pull current league injuries from ESPN, upsert into players + injuries collection."""
+    """Pull current NFL injuries from ESPN and upsert into players."""
     loop = asyncio.get_event_loop()
     try:
         payload = await loop.run_in_executor(None, _fetch_injuries_sync)
@@ -280,25 +332,13 @@ async def refresh_injuries(db) -> dict:
     for inj in flat:
         if not inj["name_normalized"] or inj["status_normalized"] in ("active", ""):
             continue
-        q = {}
-        q["name"] = {"$regex": f"^{re.escape(inj['name'])}$", "$options": "i"}
+        q = {"name": {"$regex": f"^{re.escape(inj['name'])}$", "$options": "i"}}
         if inj.get("team"):
             q["team"] = inj["team"]
         target = await db.players.find_one(q, {"_id": 0, "id": 1})
-        if target:
-            await db.players.update_one({"id": target["id"]}, {
-                "$set": {
-                    "injury_status": inj["status"],
-                    "injury_short": inj["short_comment"][:280],
-                    "injury_type": inj.get("type"),
-                    "injury_updated_at": datetime.now(timezone.utc).isoformat(),
-                }
-            })
-            matched += 1
-            matched_ids.add(target["id"])
-            continue
-        q.pop("team", None)
-        target = await db.players.find_one(q, {"_id": 0, "id": 1})
+        if not target:
+            q.pop("team", None)
+            target = await db.players.find_one(q, {"_id": 0, "id": 1})
         if target:
             await db.players.update_one({"id": target["id"]}, {
                 "$set": {
@@ -316,13 +356,8 @@ async def refresh_injuries(db) -> dict:
         {"_id": 0, "id": 1, "injury_status": 1},
     ).to_list(length=2000)
     new_status = {r["id"]: r.get("injury_status") for r in new_rows}
-    changed_ids = set()
-    for pid, new_st in new_status.items():
-        if prior.get(pid) != new_st:
-            changed_ids.add(pid)
-    for pid, old_st in prior.items():
-        if pid not in new_status and old_st:
-            changed_ids.add(pid)
+    changed_ids = {pid for pid, st in new_status.items() if prior.get(pid) != st}
+    changed_ids |= {pid for pid, st in prior.items() if pid not in new_status and st}
 
     invalidated = 0
     if changed_ids:
@@ -335,10 +370,7 @@ async def refresh_injuries(db) -> dict:
          "fetched": len(flat), "matched": matched, "outlooks_invalidated": invalidated},
         upsert=True,
     )
-    logger.info(
-        f"Injuries refresh: fetched {len(flat)}, matched {matched}, "
-        f"changed {len(changed_ids)} players, invalidated {invalidated} outlooks"
-    )
+    logger.info(f"Injuries refresh: fetched {len(flat)}, matched {matched}, invalidated {invalidated} outlooks")
     return {"status": "ok", "fetched": len(flat), "matched": matched,
             "outlooks_invalidated": invalidated, "changed_players": len(changed_ids)}
 
