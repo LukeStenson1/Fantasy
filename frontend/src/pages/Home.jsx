@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { api } from "../lib/api";
 import AdSlot from "../components/AdSlot";
-import { PositionBadge } from "../components/Badges";
+import { PositionBadge, TagBadge } from "../components/Badges";
 import { useSport } from "../contexts/SportContext";
 import {
   Select,
