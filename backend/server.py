@@ -1225,11 +1225,36 @@ async def refresh_mlb(request: Request, force: bool = False):
 
 @api.post("/admin/refresh-data")
 async def refresh_data(request: Request, force: bool = True):
-    """Re-pull latest player data from nfl-data-py (nflverse)."""
+    """Re-pull latest player data from nfl-data-py (nflverse) + NBA + MLB."""
     user = await require_user(request, db)
     if user.get("role") != "admin":
         raise HTTPException(403, "Admin only")
+
+    from .nba_data_service import refresh_nba_data
+    from .mlb_data_service import refresh_mlb_data
+    from .espn_injuries import _fetch_news_sync, refresh_news
+
+    # NFL data
     result = await refresh_player_data(db, force=force)
+
+    # NBA data
+    nba_result = await refresh_nba_data(db, force=force)
+    result["nba"] = nba_result
+
+    # MLB data
+    mlb_result = await refresh_mlb_data(db, force=force)
+    result["mlb"] = mlb_result
+
+    # News for all three sports
+    loop = asyncio.get_event_loop()
+    all_news = []
+    for sport_key in ["nfl", "nba", "mlb"]:
+        sport_news = await loop.run_in_executor(None, _fetch_news_sync, sport_key)
+        all_news.extend(sport_news)
+    news_updated = await refresh_news(db, all_news)
+    result["news_updated"] = news_updated
+    logger.info(f"News refresh complete: {news_updated} players updated")
+
     return result
 
 
