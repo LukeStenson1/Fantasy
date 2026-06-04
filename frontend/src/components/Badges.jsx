@@ -12,8 +12,26 @@ export function PositionBadge({ position }) {
   );
 }
 
-export function TagBadge({ tag }) {
+export function TagBadge({ tag, config }) {
   if (!tag || !TAG_STYLES[tag]) return null;
+
+  // Elite tag uses sport accent color if config provided
+  if (tag === "elite" && config) {
+    return (
+      <span
+        className="inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold tracking-wider"
+        style={{
+          background: config.hexAlpha,
+          color: config.hexLight,
+          borderColor: config.hexBorder,
+        }}
+        data-testid="tag-badge-elite"
+      >
+        ELITE
+      </span>
+    );
+  }
+
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold tracking-wider ${TAG_STYLES[tag]}`}
@@ -38,7 +56,12 @@ export function InjuryBadge({ status, short }) {
   if (!status) return null;
   const key = status.toLowerCase().replace(/[^a-z]/g, "");
   const cls = INJURY_STYLES[key] || INJURY_STYLES.questionable;
-  const code = key === "out" ? "OUT" : key === "doubtful" ? "D" : key === "questionable" ? "Q" : key === "probable" ? "P" : key.startsWith("ir") || key === "pup" ? "IR" : status.slice(0, 3).toUpperCase();
+  const code = key === "out" ? "OUT"
+    : key === "doubtful" ? "D"
+    : key === "questionable" ? "Q"
+    : key === "probable" ? "P"
+    : key.startsWith("ir") || key === "pup" ? "IR"
+    : status.slice(0, 3).toUpperCase();
   return (
     <span
       className={`inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10px] font-bold tracking-wider ${cls}`}
@@ -95,6 +118,7 @@ export function MatchupBadge({ rank, opp, position, fptsAllowed, source, compact
   if (fptsAllowed) tipParts.push(`${fptsAllowed.toFixed(1)} FPts allowed/G`);
   if (source === "static") tipParts.push("(2024 baseline — refresh data for live)");
   const title = tipParts.join(" · ");
+
   if (compact) {
     return (
       <span
@@ -102,18 +126,19 @@ export function MatchupBadge({ rank, opp, position, fptsAllowed, source, compact
         title={title}
         data-testid={`matchup-badge-${b}`}
       >
-        <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`}></span>
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`} />
         #{rank}
       </span>
     );
   }
+
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold tracking-wider ${cls}`}
       title={title}
       data-testid={`matchup-badge-${b}`}
     >
-      <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`}></span>
+      <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`} />
       {label} #{rank}
     </span>
   );
