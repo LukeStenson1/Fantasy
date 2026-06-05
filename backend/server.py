@@ -1303,6 +1303,10 @@ async def stats_summary():
 # ---------- Startup ----------
 @app.on_event("startup")
 async def startup():
+    try:
+        await db.outlooks.drop_index("player_id_1_scoring_1")
+    except Exception:
+        pass
     await db.users.create_index("email", unique=True)
     await db.players.create_index("id", unique=True)
     await db.players.create_index("ext_id", sparse=True)
