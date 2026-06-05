@@ -295,6 +295,7 @@ async def get_outlook(player_id: str, scoring: Literal["standard", "half_ppr", "
     text = await generate_player_outlook(p, p.get("news", []), scoring)
     doc = {
         "player_id": player_id, "scoring": scoring, "outlook": text,
+        "team": p.get("team"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.outlooks.insert_one({**doc})
@@ -310,6 +311,7 @@ async def regenerate_outlook(player_id: str, scoring: Literal["standard", "half_
     text = await generate_player_outlook(p, p.get("news", []), scoring)
     doc = {
         "player_id": player_id, "scoring": scoring, "outlook": text,
+        "team": p.get("team"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.outlooks.replace_one({"player_id": player_id, "scoring": scoring}, doc, upsert=True)
