@@ -230,7 +230,8 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
             f"AGE: {player.get('age', 'N/A')} | EXPERIENCE: {player.get('experience', 'N/A')} yrs\n"
             f"{scoring_line}"
             f"{inj_line}"
-            f"{_build_stat_line(player, sport)}\n"
+            f"RECENT SEASONS:\n{seasons_summary}"
+            f"CURRENT SEASON STATS: {_build_stat_line(player, sport)}\n"
             f"NEWS:\n{news_summary}\n\n"
             "Produce the outlook as instructed."
         )
