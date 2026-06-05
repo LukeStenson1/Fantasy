@@ -1316,7 +1316,7 @@ async def startup():
     await db.predictions.create_index("player_id")
     await db.predictions.create_index("user_id", sparse=True)
     await db.predictions.create_index("settled_at", sparse=True)
-    await db.outlooks.create_index([("player_id", 1), ("scoring", 1)], unique=True)
+    await db.outlooks.create_index([("player_id", 1), ("scoring", 1), ("team", 1)], unique=True)
 
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
