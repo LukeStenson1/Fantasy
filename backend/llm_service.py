@@ -198,9 +198,35 @@ async def generate_player_outlook(player: dict, news_items: list, scoring: str =
             else f"SCORING: {scoring.replace('_', ' ').upper()}\n"
         )
 
+        # Build multi-season context
+        all_seasons = player.get("seasons") or []
+        seasons_summary = ""
+        for s in all_seasons[-3:]:
+            if sport == "nba":
+                seasons_summary += (
+                    f"  {s.get('season')}: {s.get('games',0)}G, "
+                    f"{s.get('pts',0)}pts, {s.get('reb',0)}reb, {s.get('ast',0)}ast, "
+                    f"{s.get('fpts_per_game',0)} FPts/G\n"
+                )
+            elif sport == "mlb" and player_type == "pitcher":
+                seasons_summary += (
+                    f"  {s.get('season')}: {s.get('G',0)}G, ERA {s.get('ERA',0)}, "
+                    f"WHIP {s.get('WHIP',0)}, {s.get('SO',0)}K, {s.get('fpts_per_game',0)} FPts/G\n"
+                )
+            elif sport == "mlb":
+                seasons_summary += (
+                    f"  {s.get('season')}: {s.get('G',0)}G, {s.get('H',0)}H, "
+                    f"{s.get('HR',0)}HR, AVG {s.get('AVG',0):.3f}, {s.get('fpts_per_game',0)} FPts/G\n"
+                )
+            else:
+                seasons_summary += (
+                    f"  {s.get('season')}: {s.get('games',0)}G, "
+                    f"{s.get('fpts_per_game_half_ppr',0)} FPts/G\n"
+                )
+
         prompt = (
             f"{system_msg}\n\n"
-            f"{sport_label}: {player.get('name')} | {player.get('position')} | {player.get('team')}\n"
+            f"{sport_label}: {player.get('name')} | {player.get('position')} | CURRENT TEAM: {player.get('team')}\n"
             f"AGE: {player.get('age', 'N/A')} | EXPERIENCE: {player.get('experience', 'N/A')} yrs\n"
             f"{scoring_line}"
             f"{inj_line}"
