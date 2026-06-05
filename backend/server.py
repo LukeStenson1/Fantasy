@@ -286,7 +286,10 @@ async def get_outlook(player_id: str, scoring: Literal["standard", "half_ppr", "
     p = await db.players.find_one({"id": player_id}, {"_id": 0})
     if not p:
         raise HTTPException(404, "Player not found")
-    cached = await db.outlooks.find_one({"player_id": player_id, "scoring": scoring}, {"_id": 0})
+    cached = await db.outlooks.find_one(
+        {"player_id": player_id, "scoring": scoring, "team": p.get("team")},
+        {"_id": 0}
+    )
     if cached:
         return cached
     text = await generate_player_outlook(p, p.get("news", []), scoring)
