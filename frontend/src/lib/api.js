@@ -20,12 +20,29 @@ export function extractPlayers(data) {
 }
 
 export const POSITION_STYLES = {
-  QB: "bg-red-500/15 text-red-300 border-red-500/40",
-  RB: "bg-blue-500/15 text-blue-300 border-blue-500/40",
-  WR: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-  TE: "bg-amber-500/15 text-amber-300 border-amber-500/40",
-  K: "bg-pink-500/15 text-pink-300 border-pink-500/40",
+  // NFL
+  QB:  "bg-red-500/15 text-red-300 border-red-500/40",
+  RB:  "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  WR:  "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  TE:  "bg-amber-500/15 text-amber-300 border-amber-500/40",
+  K:   "bg-pink-500/15 text-pink-300 border-pink-500/40",
   DEF: "bg-slate-500/15 text-slate-300 border-slate-500/40",
+  // NBA
+  PG:  "bg-sky-500/15 text-sky-300 border-sky-500/40",
+  SG:  "bg-violet-500/15 text-violet-300 border-violet-500/40",
+  SF:  "bg-teal-500/15 text-teal-300 border-teal-500/40",
+  PF:  "bg-orange-500/15 text-orange-300 border-orange-500/40",
+  C:   "bg-rose-500/15 text-rose-300 border-rose-500/40",
+  // MLB batters
+  "1B": "bg-blue-500/15 text-blue-300 border-blue-500/40",
+  "2B": "bg-cyan-500/15 text-cyan-300 border-cyan-500/40",
+  "3B": "bg-amber-500/15 text-amber-300 border-amber-500/40",
+  SS:   "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  OF:   "bg-green-500/15 text-green-300 border-green-500/40",
+  DH:   "bg-purple-500/15 text-purple-300 border-purple-500/40",
+  // MLB pitchers
+  SP:   "bg-red-500/15 text-red-300 border-red-500/40",
+  RP:   "bg-pink-500/15 text-pink-300 border-pink-500/40",
 };
 
 export const TAG_STYLES = {
