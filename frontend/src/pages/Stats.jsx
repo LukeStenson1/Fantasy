@@ -105,7 +105,7 @@ export default function Stats() {
   return (
     <div className="min-h-screen bg-[#0a0e16]">
       <Navbar />
-      <div className="border-b border-slate-800 bg-slate-950/60">
+      <div className="border-b border-slate-800 bg-slate-950/60" style={{ borderTopColor: config.hex, borderTopWidth: 2 }}>
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div
             className="text-[10px] font-bold tracking-[0.25em] uppercase mb-2"
