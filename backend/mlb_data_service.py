@@ -307,7 +307,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 games = safe_int(stat.get("gamesPlayed"))
                 gs = safe_int(stat.get("gamesStarted"))
 
-                if games < (2 if season == current_year else 5):
+                if games < (1 if season == current_year else 5):
                     continue
 
                 pos = "SP" if gs >= games * 0.5 else "RP"
