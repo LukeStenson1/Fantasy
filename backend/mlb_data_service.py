@@ -235,7 +235,7 @@ def _fetch_mlb_players_sync(seasons_back: int = 3) -> list[dict]:
                 team_abv = MLB_TEAM_NAME_TO_ABV.get(team_name, team.get("abbreviation", ""))
                 games = safe_int(stat.get("gamesPlayed"))
 
-                if games < (5 if season == current_year else 20):
+                if games < (1 if season == current_year else 20):
                     continue
 
                 # Get position from players endpoint
